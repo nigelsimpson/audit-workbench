@@ -1,5 +1,7 @@
 import React from 'react';
-import { Card, IconButton, ListItem, ListItemIcon, ListItemText, Typography } from '@mui/material';
+import {
+  Card, IconButton, ListItem, ListItemIcon, ListItemText, Typography,
+} from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
 import BanIcon from '@mui/icons-material/NotInterested';
 import { RestoreOutlined } from '@mui/icons-material';
@@ -8,6 +10,7 @@ import WarningOutlinedIcon from '@mui/icons-material/WarningOutlined';
 import { Dependency } from '@api/types';
 import { useTranslation } from 'react-i18next';
 import IconComponent from '../../../../../../components/IconComponent/IconComponent';
+import useMode from '@hooks/useMode';
 
 interface DependencyTreeProps {
   dependencies: Array<Dependency>;
@@ -23,6 +26,7 @@ const DependencyTree = ({
   onDependencyRestore,
 }: DependencyTreeProps) => {
   const { t } = useTranslation();
+  const { props } = useMode();
 
   return (
     <Card elevation={1} id="DependencyTree" className="dependencies-tree">
@@ -87,27 +91,31 @@ const DependencyTree = ({
                       )}
                     </div>
 
+                    <div className="info-container scope">
+                        <Typography variant="subtitle1">{t('Table:Scope')}</Typography>
+                        <div className="pill-scope">
+                          <small>{item.scope || '-'}</small>
+                        </div>
+                    </div>
+
                     <div className="item-action-buttons">
                       {item.status === 'pending' && (
                         <>
-                          <IconButton title={t('Tooltip:Accept')} onClick={() => onDependencyAccept(item)} size="large">
+                          <IconButton data-write {...props} title={t('Tooltip:Accept')} onClick={() => onDependencyAccept(item)} size="large">
                             <CheckIcon className="icon check" fontSize="inherit" />
                           </IconButton>
-                          <IconButton title={t('Tooltip:Dismiss')} onClick={() => onDependencyReject(item)} size="large">
+                          <IconButton data-write {...props} title={t('Tooltip:Dismiss')} onClick={() => onDependencyReject(item)} size="large">
                             <BanIcon className="icon ban" fontSize="inherit" />
                           </IconButton>
                         </>
                       )}
                       {(item.status === 'original' || item.status === 'identified') && (
-                        <>
-                          <IconButton title={t('Tooltip:Restore')} onClick={() => onDependencyRestore(item)} size="large">
-                            <RestoreOutlined className="icon" fontSize="inherit" />
-                          </IconButton>
-                        </>
+                        <IconButton data-write {...props} title={t('Tooltip:Restore')} onClick={() => onDependencyRestore(item)} size="large">
+                          <RestoreOutlined className="icon" fontSize="inherit" />
+                        </IconButton>
                       )}
                     </div>
                   </ListItem>
-                  {/* <Divider/> */}
                 </React.Fragment>
               );
             }}

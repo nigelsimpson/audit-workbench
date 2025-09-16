@@ -5,6 +5,7 @@ import { IProject, ScanState } from '../../api/types';
 import packageJson from '../../../release/app/package.json';
 import { Scanner } from '../task/scanner/types';
 import * as ScannerCFG from '../task/scanner/types';
+import { workspace } from './Workspace';
 
 export class Metadata {
   private appVersion: string;
@@ -35,24 +36,23 @@ export class Metadata {
 
   private scannerConfig: Scanner.ScannerConfig;
 
+  private sourceCodePath: string;
+
   constructor(name: string) {
     this.name = name;
-    this.appVersion =
-      app.isPackaged === true ? app.getVersion() : packageJson.version;
+    this.appVersion = app.isPackaged === true ? app.getVersion() : packageJson.version;
     this.date = new Date().toISOString();
     this.uuid = uuidv4();
   }
 
   public static async readFromPath(pathToProject: string): Promise<Metadata> {
-    const data: Metadata = JSON.parse(
-      await fs.promises.readFile(`${pathToProject}/metadata.json`, 'utf8')
-    );
+    const data: Metadata = JSON.parse(await fs.promises.readFile(`${pathToProject}/metadata.json`, 'utf8'));
     return Object.assign(Object.create(Metadata.prototype), data);
   }
 
   public save(): void {
     const str = JSON.stringify(this, null, 2);
-    fs.writeFileSync(`${this.work_root}/metadata.json`, str);
+    fs.writeFileSync(`${this.getMyPath()}/metadata.json`, str);
   }
 
   public setAppVersion(appVersion: string) {
@@ -71,8 +71,16 @@ export class Metadata {
     this.date = date;
   }
 
+  public getDate(): string {
+    return this.date;
+  }
+
   public setMyPath(workRoot: string) {
     this.work_root = workRoot;
+  }
+
+  public getWorkRoot() {
+    return this.work_root;
   }
 
   public setScanRoot(scanRoot: string) {
@@ -120,7 +128,7 @@ export class Metadata {
   }
 
   public getMyPath(): string {
-    return this.work_root;
+    return `${workspace.getMyPath()}/${this.work_root}`;
   }
 
   public getUUID(): string {
@@ -163,6 +171,14 @@ export class Metadata {
     this.scannerConfig = value;
   }
 
+  public setSourceCodePath(sourceCodePath: string) {
+    this.sourceCodePath = sourceCodePath;
+  }
+
+  public getSourceCodePath() {
+    return this.sourceCodePath;
+  }
+
   public getDto(): IProject {
     const Ip: IProject = {
       appVersion: this.appVersion,
@@ -179,6 +195,7 @@ export class Metadata {
       api_key: this.apiKey,
       source: this.source,
       scannerConfig: this.scannerConfig,
+      sourceCodePath: this.sourceCodePath,
     };
     return Ip;
   }

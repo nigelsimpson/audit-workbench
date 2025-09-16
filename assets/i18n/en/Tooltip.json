@@ -42,10 +42,19 @@
   "ExportHintRAW": "Export the raw JSON responses from the SCANOSS Platform",
   "ExportHintCSV": "Export Comma Separate Value report",
   "ExportHintSPDXLite": "Export an SPDX compliant SBOM report",
-  "ExportHintHTML": "Export a HTML summary of the Identification report",
+  "ExportHintCycloneDX": "Export a CycloneDX compliant SBOM JSON",
+  "ExportHintHTML": "Export a HTML summary of the report",
   "TotalFiles": "Total Files",
   "Detected": "Detected",
   "NotDetected": "Not Detected",
   "Ignored": "Ignored",
-  "Progress": "Progress"
+  "Progress": "Progress",
+  "RefreshReportButtonLabel": "Update report for the latest vulnerabilities and cryptography data",
+  "OpenInReadMode": "Open in read-only mode",
+  "ExportHintCSVSBOM": "Export SBOM report",
+  "ExportHintCSVCryptography": "Export Cryptography report",
+  "ExportHintSettings": "Export a settings file",
+  "ExportCSVVulnerability": "Export Vulnerability Report",
+  "ExportHintCycloneDXVulnerabilities": "Export a CycloneDX compliant SBOM JSON with vulnerabilities",
+  "ExportHintBOM": "Export Bill of Materials (BOM)"
 }

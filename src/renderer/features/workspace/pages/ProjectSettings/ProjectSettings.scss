@@ -8,10 +8,13 @@
       justify-content: space-between;
     }
 
-    .project-form-container {
-      max-width: 600px;
-      min-width: 400px;
+    .grid-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+    }
 
+    .form-container {
       .project-license-container {
         .input-container {
           transform-origin: 0;
@@ -43,9 +46,6 @@
               margin-left: 4px;
             }
 
-            .api-key {
-              color: gray;
-            }
           }
 
           .error-message {
@@ -69,12 +69,23 @@
           }
         }
       }
+
+      .context-files-info {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 24px;
+
+        a{
+          cursor: pointer;
+        }
+      }
     }
   }
 
   .input-container-license,
   .api-subcontainer {
-    max-width: 500px;
+    max-width: 600px;
   }
 
   .label-input-container {
@@ -90,6 +101,10 @@
     display: flex;
     justify-content: flex-end;
 
+    position: fixed;
+    bottom: 16px;
+    right: 60px;
+
     .btn {
       padding: 12px 24px;
       border-radius: 4px;
@@ -103,8 +118,6 @@
     }
   }
 
-  .error {
-  }
 
   .input-label {
     font-weight: 600;
@@ -124,5 +137,10 @@
 
   .item-default {
     color: #a8a8a8 !important;
+  }
+
+  .helper {
+    margin-left: 32px;
+    margin-top: -8px;
   }
 }

@@ -1,33 +1,19 @@
 /* eslint-disable import/no-cycle */
 /* eslint-disable jsx-a11y/label-has-associated-control */
-import React, { useContext, useEffect, useState } from 'react';
-import { Dialog, Tooltip, Paper, DialogActions, Button, InputBase, TextField, IconButton } from '@mui/material';
-import { makeStyles } from '@mui/styles';
-import SearchIcon from '@mui/icons-material/Search';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
+import { Dialog, Tooltip, Paper, DialogActions, Button, InputBase, TextField, IconButton, Box } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import Autocomplete from '@mui/material/Autocomplete';
 import { NewComponentDTO } from '@api/types';
 import { DialogResponse, DIALOG_ACTIONS } from '@context/types';
 import { ResponseStatus } from '@api/Response';
 import { componentService } from '@api/services/component.service';
 import { licenseService } from '@api/services/license.service';
 import { DialogContext } from '@context/DialogProvider';
-import CloseIcon from "@mui/icons-material/Close";
+import CloseIcon from '@mui/icons-material/Close';
 import { useTranslation } from 'react-i18next';
 import LicenseSelector from '@components/LicenseSelector/LicenseSelector';
-
-const useStyles = makeStyles((theme) => ({
-  size: {
-    '& .MuiDialog-paperWidthMd': {
-      width: '500px',
-    },
-  },
-  componentVersion: {
-    display: 'grid',
-    gridTemplateColumns: '1.5fr 0.75fr',
-    gridGap: '20px',
-  },
-}));
+import { PackageURL } from 'packageurl-js';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 interface ComponentDialogProps {
   open: boolean;
@@ -38,20 +24,20 @@ interface ComponentDialogProps {
 }
 
 export const ComponentDialog = (props: ComponentDialogProps) => {
-  const classes = useStyles();
   const { t } = useTranslation();
 
   const { open, onClose, onCancel, component, label } = props;
   const [form, setForm] = useState<
-    Partial<{
-      name: string;
-      version;
-      licenseId: number;
-      purl: string;
-      url: string;
-    }>
+  Partial<{
+    name: string;
+    version;
+    licenseId: number;
+    purl: string;
+    url: string;
+  }>
   >({});
   const dialogCtrl = useContext<any>(DialogContext);
+  const [purlError, setPurlError] = useState<string>('');
   const [licenses, setLicenses] = useState<any[]>();
   const [readOnly, setReadOnly] = useState<boolean>();
   const [license, setLicense] = useState<any>({}); // <License>
@@ -68,17 +54,61 @@ export const ComponentDialog = (props: ComponentDialogProps) => {
     }
   };
 
+  const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
+
+  // Create a debounced version of validatePurl
+  const debouncedValidatePurl = useCallback(
+    debounce((value) => validatePurl(value), 200),
+    [],
+  );
+
   const inputHandler = (name, value) => {
     setForm({
       ...form,
       [name]: value,
     });
+
+    // Validate PURL when changed with debounce
+    if (name === 'purl') {
+      debouncedValidatePurl(value);
+    }
+  };
+
+  const validatePurl = (purlString: string): boolean => {
+    if (!purlString) {
+      setPurlError('');
+      return false;
+    }
+    try {
+      PackageURL.fromString(purlString);
+      setPurlError('');
+      return true;
+    } catch (error) {
+      setPurlError(t('Dialog:CreateComponentPurlError'));
+      return false;
+    }
   };
 
   const handleClose = async (e) => {
     e.preventDefault();
     try {
       const { name, version, licenseId, purl, url } = form;
+
+      // Validate PURL before submission
+      if (!validatePurl(purl)) {
+        return;
+      }
+
       const dto: NewComponentDTO = {
         name,
         purl,
@@ -94,7 +124,6 @@ export const ComponentDialog = (props: ComponentDialogProps) => {
       const response = await componentService.create(dto);
       onClose({ action: DIALOG_ACTIONS.OK, data: { component: response, created: dto } });
     } catch (error: any) {
-      console.log('error', error);
       await dialogCtrl.openConfirmDialog(error.message, { label: t('Button:Accept'), role: 'accept' }, true);
     }
   };
@@ -109,18 +138,17 @@ export const ComponentDialog = (props: ComponentDialogProps) => {
 
   const isValid = () => {
     const { name, version, licenseId, purl } = form;
-    return name && version && licenseId && purl;
+    return name && version && licenseId && purl && !purlError;
   };
 
   useEffect(() => {
     fetchData();
   }, [open]);
 
-
   useEffect(() => {
     setForm({
       ...form,
-      licenseId: license?.id || null
+      licenseId: license?.id || null,
     });
   }, [license]);
 
@@ -129,11 +157,16 @@ export const ComponentDialog = (props: ComponentDialogProps) => {
   return (
     <Dialog
       id="ComponentDialog"
-      className={`${classes.size} dialog`}
+      className="dialog"
       maxWidth="md"
       scroll="body"
       fullWidth
       open={open}
+      sx={{
+        '& .MuiDialog-paper': {
+          width: 500,
+        },
+      }}
       onClose={onCancel}
     >
       <header className="dialog-title">
@@ -145,7 +178,14 @@ export const ComponentDialog = (props: ComponentDialogProps) => {
 
       <form onSubmit={handleClose}>
         <div className="dialog-content">
-          <div className={`dialog-row ${classes.componentVersion} `}>
+          <Box
+            className="dialog-row"
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: '1.5fr 0.75fr',
+              gap: '20px'
+            }}
+          >
             <div className="dialog-form-field">
               <label className="dialog-form-field-label">{t('Title:Component')}</label>
               <Paper className="dialog-form-field-control">
@@ -175,7 +215,7 @@ export const ComponentDialog = (props: ComponentDialogProps) => {
                 />
               </Paper>
             </div>
-          </div>
+          </Box>
 
           <div className="dialog-form-field">
             <div className="dialog-form-field-label">
@@ -192,7 +232,7 @@ export const ComponentDialog = (props: ComponentDialogProps) => {
                 value={license}
                 isOptionEqualToValue={(option, value) => option.spdxid === value.spdxid}
                 getOptionLabel={(option) => option.name || ''}
-                onChange={(e, lic ) => setLicense(lic)}
+                onChange={(e, lic) => setLicense(lic)}
               />
             </div>
           </div>
@@ -200,7 +240,39 @@ export const ComponentDialog = (props: ComponentDialogProps) => {
           {!readOnly && (
             <>
               <div className="dialog-form-field">
-                <label className="dialog-form-field-label">{t('Title:PURL')}</label>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    gap: '0.3em',
+                    alignItems: 'baseline',
+                  }}
+                >
+                  <label className="dialog-form-field-label">{t('Title:PURL')}</label>
+                  <Box
+                    sx={{
+                      color: '#f44336',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {purlError && (
+                      <>
+                        <ErrorOutlineIcon
+                          sx={{
+                            fontSize: '12px',
+                            marginRight: '1px',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                        />
+                        <span>{purlError}</span>
+                      </>
+                    )}
+                  </Box>
+                </Box>
                 <Paper className="dialog-form-field-control">
                   <TextField
                     name="purl"
@@ -209,6 +281,8 @@ export const ComponentDialog = (props: ComponentDialogProps) => {
                     value={form?.purl}
                     onChange={(e) => inputHandler(e.target.name, e.target.value)}
                     required
+                    placeholder="pkg:type/namespace/name"
+                    error={!!purlError}
                   />
                 </Paper>
               </div>
@@ -232,7 +306,9 @@ export const ComponentDialog = (props: ComponentDialogProps) => {
         </div>
 
         <DialogActions>
-          <Button tabIndex={-1} color="inherit" onClick={onCancel}>{t('Button:Cancel')}</Button>
+          <Button tabIndex={-1} color="inherit" onClick={onCancel}>
+            {t('Button:Cancel')}
+          </Button>
           <Button type="submit" variant="contained" color="secondary" disabled={!isValid()}>
             {t('Button:Create')}
           </Button>

@@ -7,6 +7,9 @@ import IconButton from '@mui/material/IconButton';
 import { Tooltip } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import IconComponent from '../IconComponent/IconComponent';
+import { selectIsReadOnly } from '@store/workbench-store/workbenchSlice';
+import { useSelector } from 'react-redux';
+import useMode from '@hooks/useMode';
 
 export enum MATCH_INFO_CARD_ACTIONS {
   ACTION_ENTER,
@@ -36,6 +39,8 @@ interface MatchInfoCardProps {
 
 const MatchInfoCard = ({ match, onSelect, status, selected, onAction }: MatchInfoCardProps) => {
   const { t } = useTranslation();
+  const { props } = useMode();
+
   const [over, setOver] = useState<boolean>(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const ref = React.useRef<any>();
@@ -65,6 +70,10 @@ const MatchInfoCard = ({ match, onSelect, status, selected, onAction }: MatchInf
                 <span className="match-info-data version">
                   <span className="label">{t('Title:Version')}</span>
                   <span className="value">{match.version}</span>
+                </span>
+                <span className="match-info-data license">
+                  <span className="label">{t('Title:License')}</span>
+                  <span className="value">{match.license}</span>
                 </span>
                 <div className="match-info-data usage">
                   {status === 'pending' && <span className="label">{t('Title:Detected')}</span>}
@@ -108,12 +117,12 @@ const MatchInfoCard = ({ match, onSelect, status, selected, onAction }: MatchInf
               {status === 'pending' && (
                 <>
                   <Tooltip title={t('Tooltip:Identify')}>
-                    <IconButton onClick={() => onAction(MATCH_INFO_CARD_ACTIONS.ACTION_IDENTIFY)} size="large">
+                    <IconButton data-write {...props } onClick={() => onAction(MATCH_INFO_CARD_ACTIONS.ACTION_IDENTIFY)} size="large">
                       <CheckIcon className="icon check" />
                     </IconButton>
                   </Tooltip>
                   <Tooltip title={t('Tooltip:MarkAsOriginal')}>
-                    <IconButton onClick={() => onAction(MATCH_INFO_CARD_ACTIONS.ACTION_IGNORE)} size="large">
+                    <IconButton data-write {...props } onClick={() => onAction(MATCH_INFO_CARD_ACTIONS.ACTION_IGNORE)} size="large">
                       <BanIcon className="icon ban" />
                     </IconButton>
                   </Tooltip>
@@ -121,7 +130,7 @@ const MatchInfoCard = ({ match, onSelect, status, selected, onAction }: MatchInf
               )}
               {status === 'ignored' && (
                 <>
-                  <Tooltip title={t('Tooltip:Restore')}>
+                  <Tooltip data-write {...props } title={t('Tooltip:Restore')}>
                     <IconButton onClick={() => onAction(MATCH_INFO_CARD_ACTIONS.ACTION_RESTORE)} size="large">
                       <RestoreOutlined className="icon" />
                     </IconButton>
@@ -131,12 +140,12 @@ const MatchInfoCard = ({ match, onSelect, status, selected, onAction }: MatchInf
               {status === 'identified' && (
                 <>
                   <Tooltip title={t('Tooltip:RemoveIdentification')}>
-                    <IconButton onClick={() => onAction(MATCH_INFO_CARD_ACTIONS.ACTION_DETACH)} size="large">
+                    <IconButton data-write {...props } onClick={() => onAction(MATCH_INFO_CARD_ACTIONS.ACTION_DETACH)} size="large">
                       <RestoreOutlined className="icon" />
                     </IconButton>
                   </Tooltip>
                   <Tooltip title={t('Tooltip:ViewIdentification')}>
-                    <IconButton onClick={() => onAction(MATCH_INFO_CARD_ACTIONS.ACTION_DETAIL)} size="large">
+                    <IconButton data-write {...props } onClick={() => onAction(MATCH_INFO_CARD_ACTIONS.ACTION_DETAIL)} size="large">
                       <DescriptionOutlined />
                     </IconButton>
                   </Tooltip>
@@ -155,12 +164,16 @@ const MatchInfoCard = ({ match, onSelect, status, selected, onAction }: MatchInf
           >
             <div className="component-details-matchinfo">
               <div className="tiny-container-detail-matchinfo">
-                <p className="title-detail-matchinfo">{t('Title:License')}</p>
-                <p className="desc-detail-matchinfo">{match?.license || '-'}</p>
-              </div>
-              <div className="tiny-container-detail-matchinfo">
                 <p className="title-detail-matchinfo">{t('Title:PURL')}</p>
                 <p className="desc-detail-matchinfo">{match?.purl}</p>
+              </div>
+              <div className="tiny-container-detail-matchinfo">
+                <p className="title-detail-matchinfo">{t('Title:Version')}</p>
+                <p className="desc-detail-matchinfo">{match?.version}</p>
+              </div>
+              <div className="tiny-container-detail-matchinfo">
+                <p className="title-detail-matchinfo">{t('Title:License')}</p>
+                <p className="desc-detail-matchinfo">{match?.license || '-'}</p>
               </div>
               <div className="tiny-container-detail-matchinfo">
                 <p className="title-detail-matchinfo">{t('Title:URL')}</p>

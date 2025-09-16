@@ -1,26 +1,50 @@
-import { Model } from '../model/Model';
-import { ScanModel } from '../model/ScanModel';
+/* eslint-disable no-underscore-dangle */
+import sqlite3 from 'sqlite3';
+import { ProjectModel } from '../model/project/ProjectModel';
+import { WorkspaceModel } from '../model/workspace/WorkspaceModel';
 
 class ModelProvider {
-  private _model: ScanModel;
+  private _model: ProjectModel;
+
+  private _workspace: WorkspaceModel;
 
   private projectPath: string;
 
+  private _openModeProjectModel: number = sqlite3.OPEN_READWRITE;
 
-  public get model(): ScanModel {
+  // TODO: Change model by project
+  public get model(): ProjectModel {
     // eslint-disable-next-line no-underscore-dangle
     return this._model;
   }
 
-  public set model(value: ScanModel) {
+  public set model(value: ProjectModel) {
     // eslint-disable-next-line no-underscore-dangle
     this._model = value;
   }
 
+  public set openModeProjectModel(mode: number) {
+    // eslint-disable-next-line no-underscore-dangle
+    this._openModeProjectModel = mode;
+  }
+
+  public get workspace():WorkspaceModel {
+    // eslint-disable-next-line no-underscore-dangle
+    return this._workspace;
+  }
+
+  public async initWorkspaceModel(wsPath: string) {
+    const workspaceModel = new WorkspaceModel(wsPath);
+    await workspaceModel.init();
+    // eslint-disable-next-line no-underscore-dangle
+    this._workspace = workspaceModel;
+  }
+
   public async init(projectPath: string) {
-    await new Model(projectPath).init();
-    const model = new ScanModel(projectPath);
-    this.model = model;
+    const model = new ProjectModel(projectPath);
+    // eslint-disable-next-line no-underscore-dangle
+    await model.init(this._openModeProjectModel);
+    this._model = model;
   }
 }
 

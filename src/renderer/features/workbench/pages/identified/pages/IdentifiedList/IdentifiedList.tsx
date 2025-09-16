@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { makeStyles } from '@mui/styles';
 import { useNavigate } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import { componentService } from '@api/services/component.service';
@@ -29,25 +28,8 @@ const filter = (items, query) => {
   return result;
 };
 
-const useStyles = makeStyles((theme) => ({
-  root: {
-    padding: '2px 4px',
-    display: 'flex',
-    alignItems: 'center',
-    width: 420,
-  },
-  input: {
-    marginLeft: theme.spacing(1),
-    flex: 1,
-  },
-  iconButton: {
-    padding: 10,
-  },
-}));
-
 export const IdentifiedList = () => {
   const navigate = useNavigate();
-  const classes = useStyles();
   const dispatch = useDispatch();
   const { limit, onScroll } = usePagination();
   const { t } = useTranslation();
@@ -60,7 +42,7 @@ export const IdentifiedList = () => {
     const { purl } = grouped.inventories[0];
     const comp = await componentService.get({ purl }, { unique: true });
     dispatch(setComponent(comp));
-    navigate(`/workbench/identified/inventory`);
+    navigate('/workbench/identified/inventory');
   };
 
   const init = async () => {
@@ -76,42 +58,40 @@ export const IdentifiedList = () => {
   }, []);
 
   return (
-    <>
-      <section id="IdentifiedList" className="app-page" onScroll={onScroll}>
-        <header className="app-header">
-          <Breadcrumb />
-          <div className="search-box">
-            <SearchBox onChange={(value) => setSearchQuery(value.trim().toLowerCase())} />
-          </div>
-        </header>
+    <section id="IdentifiedList" className="app-page" onScroll={onScroll}>
+      <header className="app-header">
+        <Breadcrumb />
+        <div className="search-box">
+          <SearchBox onChange={(value) => setSearchQuery(value.trim().toLowerCase())} />
+        </div>
+      </header>
 
-        <main className="app-content">
-          {filterItems && filterItems.length > 0 ? (
-            <section className="component-list">
-              {filterItems.slice(0, limit).map((inventory) => (
-                <RecognizedCard
-                  key={inventory.component}
-                  inventory={inventory}
-                  onClick={() => onSelectComponent(inventory)}
-                />
-              ))}
-            </section>
-          ) : (
-            <p>
-              {searchQuery ? t('NotResultsFoundWith', { searchQuery }) : t('NoComponentsIdentified')}
-            </p>
-          )}
+      <main className="app-content">
+        {filterItems && filterItems.length > 0 ? (
+          <section className="identified-list">
+            {filterItems.slice(0, limit).map((inventory) => (
+              <RecognizedCard
+                key={inventory.component}
+                inventory={inventory}
+                onClick={() => onSelectComponent(inventory)}
+              />
+            ))}
+          </section>
+        ) : (
+          <p>
+            {searchQuery ? t('NotResultsFoundWith', { searchQuery }) : t('NoComponentsIdentified')}
+          </p>
+        )}
 
-          {filterItems?.length > limit && (
-            <Alert className="my-5" severity="info">
-              <strong>
-                {t('ShowingLimitOfTotalComponents', { limit, total: filterItems.length})}
-              </strong>
-            </Alert>
-          )}
-        </main>
-      </section>
-    </>
+        {filterItems?.length > limit && (
+        <Alert className="my-5" severity="info">
+          <strong>
+            {t('ShowingLimitOfTotalComponents', { limit, total: filterItems.length })}
+          </strong>
+        </Alert>
+        )}
+      </main>
+    </section>
   );
 };
 

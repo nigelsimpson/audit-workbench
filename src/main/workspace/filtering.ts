@@ -6,11 +6,11 @@
 
 import log from 'electron-log';
 import * as fs from 'fs';
-import { isBinaryFileSync } from 'isbinaryfile';
 
+const isBinaryPath = require('is-binary-path');
 const fpath = require('path');
 
-class AbstractFilter {
+export class AbstractFilter {
   // path: string | undefined;
   condition: string;
 
@@ -31,11 +31,12 @@ class AbstractFilter {
     return true;
   }
 }
-class NameFilter extends AbstractFilter {
+
+export class NameFilter extends AbstractFilter {
   constructor(condition: string, value: string, scope: string) {
     super(condition, value);
     this.ftype = 'NAME';
-    this.scope = scope || super.scope;
+    this.scope = scope || 'ALL';
   }
 
   evaluate(path: string): boolean {
@@ -65,11 +66,11 @@ class ContentFilter extends AbstractFilter {
   constructor(condition: string, value: string, scope: string) {
     super(condition, value);
     this.ftype = 'CONTENT';
-    this.scope = scope || super.scope; // Verificar
+    this.scope = scope || 'ALL'; // Verificar
   }
 
   evaluate(path: string): boolean {
-    const binary = isBinaryFileSync(path);
+    const binary = isBinaryPath(path);
 
     if (this.condition === '=' && this.value === 'BINARY' && binary) return false;
     if (this.condition === '!=' && this.value === 'TEXT' && binary) return false;
@@ -83,7 +84,7 @@ class ExtensionFilter extends AbstractFilter {
   constructor(condition: string, value: string, scope: string) {
     super(condition, value);
     this.ftype = 'EXTENSION';
-    this.scope = scope || super.scope; // Verificar
+    this.scope = scope || 'ALL'; // Verificar
   }
 
   evaluate(path: string): boolean {
@@ -97,7 +98,7 @@ class SizeFilter extends AbstractFilter {
   constructor(condition: string, value: string, scope: string) {
     super(condition, value);
     this.ftype = 'SIZE';
-    this.scope = scope || super.scope; // Verificar
+    this.scope = scope || 'ALL'; // Verificar
   }
 
   evaluate(path: string): boolean {
@@ -128,7 +129,7 @@ class DateFilter extends AbstractFilter {
   constructor(condition: string, value: string, scope: string) {
     super(condition, value);
     this.ftype = 'DATE';
-    this.scope = scope || super.scope; // Verificar
+    this.scope = scope || 'ALL'; // Verificar
   }
 
   evaluate(path: string): boolean {

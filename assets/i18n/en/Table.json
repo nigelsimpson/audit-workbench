@@ -16,7 +16,14 @@
     "IncompatibleLicenses": "Incompatible Licenses",
     "PURL": "PURL",
     "URL": "URL",
-    "LocalFile": "Local File"
+    "LocalFile": "Local File",
+    "Algorithm": "Algorithm",
+    "Strength ": "Strength",
+    "File": "File",
+    "Dependencies ": "Dependencies",
+    "Cryptography": "Cryptography",
+    "Type": "Type",
+    "Detected": "Detected"
   },
   "Version": "Version",
   "License": "License"

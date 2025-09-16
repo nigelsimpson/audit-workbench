@@ -1,62 +1,124 @@
 import React from 'react';
-import { makeStyles } from '@mui/styles';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import { useTranslation } from 'react-i18next';
-import IconComponent from "../../../components/IconComponent/IconComponent";
+import { AutoSizer, Column, Table } from 'react-virtualized';
+import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { fetchComponent } from '@store/component-store/componentThunks';
+import { Link } from '@mui/material';
+import { styled } from '@mui/material/styles';
 
-const useStyles = makeStyles({
-  table: {
-    minWidth: 400,
-    '& .MuiTableCell-root': {
-      padding: '6px 12px',
-    }
+/* icons  */
+import IconComponent from '../../../components/IconComponent/IconComponent';
+
+const StyledTable = styled(Table)(({ theme }) => ({
+  '& .ReactVirtualized__Table__headerColumn': {
+    fontWeight: 600,
+    fontSize: '0.875rem',
+    lineHeight: '1.5rem',
+    color: 'rgba(0, 0, 0, 0.87)',
+    textTransform: 'capitalize',
+    height: '100%',
+    alignItems: 'center',
+    display: 'flex',
   },
-});
+  '& .ReactVirtualized__Table__row': {
+    fontWeight: 400,
+    fontSize: '0.75rem',
+    borderBottom: '1px solid rgba(224, 224, 224, 1)',
+    color: 'rgba(0, 0, 0, 0.87)',
+  }
+}));
 
-export default function MatchesForLicense({ data }) {
-  const classes = useStyles();
+export default function MatchesForLicense({ components, mode }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const onSelectComponent = async (e, component: any) => {
+    e.preventDefault();
+    if (component.manifestFiles) {
+      onSelectFile(e, component.manifestFiles[0]);
+    } else {
+      const pathname = mode === 'detected' ? '/workbench/detected/component' : '/workbench/identified/inventory';
+      await dispatch(fetchComponent(component.purl));
+      navigate({ pathname });
+    }
+  };
+
+  const onSelectFile = async (e, path) => {
+    e.preventDefault();
+    navigate({
+      pathname: '/workbench/detected/file',
+      search: `?path=file|${encodeURIComponent(path)}`,
+    });
+  };
 
   return (
     <>
-      <TableContainer className="mt-2">
-        <Table stickyHeader className={classes.table}>
-          <TableHead>
-            <TableRow>
-              <TableCell align="left">{t('Table:Header:Component')}</TableCell>
-              <TableCell>{t('Table:Header:Vendor')}</TableCell>
-              <TableCell align="right">{t('Table:Header:Version')}</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody className="selectable">
-            {data.components.map((row, index) => (
-              <TableRow key={index}>
-                <TableCell component="th" scope="row" align="left">
-                  <div className="table-cell">
-                    <IconComponent name={row.vendor} size={24} />
-                    <div className="d-flex flex-column">
-                      <span>{row.name}</span>
-                      <span className="small">{row.purl}</span>
+      <AutoSizer>
+        {({ height, width }) => (
+          <StyledTable
+            height={height}
+            width={width}
+            rowHeight={42}
+            headerHeight={40}
+            rowCount={components.length}
+            rowGetter={({ index }) => components[index]}
+          >
+            <Column
+              label={t('Table:Header:Component')}
+              dataKey="component"
+              width={500}
+              flexGrow={2}
+              flexShrink={0}
+              cellRenderer={({ rowData }) => (
+                <div className="table-cell">
+                  <IconComponent name={rowData.vendor} size={30} />
+                  <div className="d-flex flex-column">
+                    <Link href="#" underline="hover" onClick={(e) => onSelectComponent(e, rowData)}>
+                      {rowData.name}
+                    </Link>
+                    <div>
+                      <span className="small">
+                        {rowData.purl}@{rowData.version}
+                      </span>
+                      {rowData.manifestFiles && (
+                        <span className="small">
+                          {' '}
+                          - Found in{' '}
+                          <Link href="#" underline="hover" color="inherit" onClick={(e) => onSelectFile(e, rowData.manifestFiles[0])}>
+                            {rowData.manifestFiles.join(' - ')}
+                          </Link>
+                        </span>
+                      )}
                     </div>
-
                   </div>
-                </TableCell>
-                <TableCell width="140">
-                  <div className="break-word-table">{row.vendor}</div>
-                </TableCell>
-                <TableCell width="80" align="right">
-                  <div className="break-word-table">{row.version}</div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                </div>
+              )}
+            />
+
+            <Column label="Files" dataKey="fileCount" width={100} flexGrow={1} flexShrink={0} />
+
+            <Column
+              label={t('Table:Header:License')}
+              dataKey="licenses"
+              width={100}
+              flexGrow={1}
+              flexShrink={0}
+              cellRenderer={({ cellData }) => {
+                const data = cellData.join(' - ');
+                return <span title={data}>{data}</span>;
+              }}
+            />
+          </StyledTable>
+        )}
+      </AutoSizer>
+
+      {components.length === 0 && (
+        <div className="mt-10 pt-2 text-center">
+          <small>No data found</small>
+        </div>
+      )}
     </>
   );
 }

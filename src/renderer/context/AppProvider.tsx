@@ -2,7 +2,7 @@ import { Button } from '@mui/material';
 import React, { useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { fetchProjects } from '@store/workspace-store/workspaceThunks';
+import { fetchProjects, init } from '@store/workspace-store/workspaceThunks';
 import { IProject } from '@api/types';
 import { workspaceService } from '@api/services/workspace.service';
 import { IpcChannels } from '@api/ipc-channels';
@@ -10,6 +10,7 @@ import { useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import { setScanPath } from '@store/workspace-store/workspaceSlice';
 import { Scanner } from 'main/task/scanner/types';
+import { DIALOG_ACTIONS } from '@context/types';
 import { DialogContext, IDialogContext } from './DialogProvider';
 import { dialogController } from '../controllers/dialog-controller';
 
@@ -18,6 +19,7 @@ export interface IAppContext {
   newProjectFromWFP: () => void;
   exportProject: (project: IProject) => void;
   importProject: () => void;
+  importFromResultFile: () => void;
 }
 
 export const AppContext = React.createContext<IAppContext | null>(null);
@@ -34,37 +36,53 @@ const AppProvider = ({ children }) => {
     });
 
     if (paths && paths.length > 0) {
-      dispatch(setScanPath({ path: paths[0], action: 'scan' }));
+      dispatch(setScanPath({ path: paths[0], action: 'scan', source: Scanner.ScannerSource.CODE }));
       navigate('/workspace/new/settings');
     }
   };
 
   const newProjectFromWFP = async () => {
-    const paths = await dialogController.showOpenDialog({
-      properties: ['openFile'],
-      filters: [{ name: 'WFP files', extensions: ['wfp'] }],
+    const r = await dialogCtrl.openImportProjectSourceDialog({
+      title: t('Dialog:ImportProjectFromWFPTitle'),
+      openDialogProperties: {
+        filters: [{ name: 'WFP files', extensions: ['wfp'] }],
+      },
+      placeHolder: t('Dialog:ImportProjectFromWFPPlaceHolder'),
     });
+    if (r.action === DIALOG_ACTIONS.CANCEL) return;
+    dispatch(setScanPath({ path: r.data.projectPath , action: 'scan', source: Scanner.ScannerSource.WFP, sourceCodePath: r.data.sourcePath }));
+    navigate('/workspace/new/settings');
+  };
 
-    if (paths && paths.length > 0) {
-      dispatch(setScanPath({ path: paths[0], action: 'scan', source: Scanner.ScannerSource.WFP }));
-      navigate('/workspace/new/settings');
-    }
+  const importFromResultFile = async () => {
+    const r = await dialogCtrl.openImportProjectSourceDialog({
+      title: t('Dialog:ImportProjectFromRawTitle'),
+      openDialogProperties: {
+        filters: [{ name: 'SCANOSS RAW results', extensions: ['json'] }],
+      },
+      placeHolder:t('Dialog:ImportProjectFromRawPlaceHolder'),
+    });
+    if (r.action === DIALOG_ACTIONS.CANCEL) return;
+
+    dispatch(setScanPath({ path: r.data.projectPath, action: 'scan', source: Scanner.ScannerSource.IMPORTED_RESULTS_RAW, sourceCodePath: r.data.sourcePath }));
+    navigate('/workspace/new/settings');
   };
 
   const importProject = async () => {
-    const paths = await dialogController.showOpenDialog({
-      properties: ['openFile'],
-      filters: [{ name: 'Zip files', extensions: ['zip'] }],
+    const r = await dialogCtrl.openImportProjectSourceDialog({
+      title: t('Dialog:ImportWorkbenchProjectTitle'),
+      openDialogProperties: {
+        filters: [{ name: 'Zip files', extensions: ['zip'] }],
+      },
+      placeHolder: t('Dialog:ImportWorkbenchProjectPlaceHolder'),
     });
-
-    if (!paths || paths.length === 0) return;
+    if (r.action === DIALOG_ACTIONS.CANCEL) return;
     const dialog = await dialogCtrl.createProgressDialog(t('Dialog:ImportingProject').toUpperCase());
     dialog.present();
-
     try {
-      await workspaceService.importProject(paths[0]);
+      await workspaceService.importProject(r.data.projectPath, r.data.sourcePath);
       setTimeout(async () => {
-        dialog.finish({ message: t('Dialog:SuccesfulImport').toUpperCase() });
+        dialog.finish({ message: t('Dialog:SuccessfulImport').toUpperCase() });
         dialog.dismiss({ delay: 1500 });
         dispatch(fetchProjects());
       }, 2000);
@@ -79,7 +97,7 @@ const AppProvider = ({ children }) => {
           label: 'OK',
           role: 'accept',
         },
-        true
+        true,
       );
     }
   };
@@ -88,11 +106,9 @@ const AppProvider = ({ children }) => {
     const path = await dialogController.showSaveDialog({
       defaultPath: `${window.os.homedir()}/Downloads/${project.name}.zip`,
     });
-
     if (!path) return;
     const dialog = await dialogCtrl.createProgressDialog(t('Dialog:ExportingProject').toUpperCase());
     dialog.present();
-
     try {
       await workspaceService.exportProject(path, project.work_root);
       setTimeout(async () => {
@@ -143,10 +159,11 @@ const AppProvider = ({ children }) => {
           label: 'OK',
           role: 'accept',
         },
-        true
+        true,
       );
     }
   };
+
 
   const setupAppMenuListeners = (): () => void => {
     const subscriptions = [];
@@ -157,6 +174,9 @@ const AppProvider = ({ children }) => {
   };
 
   useEffect(setupAppMenuListeners, []);
+  useEffect(() => {
+    dispatch(init());
+  }, []);
 
   return (
     <AppContext.Provider
@@ -165,6 +185,7 @@ const AppProvider = ({ children }) => {
         newProjectFromWFP,
         exportProject,
         importProject,
+        importFromResultFile,
       }}
     >
       {children}

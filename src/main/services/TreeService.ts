@@ -6,6 +6,7 @@ import { workspace } from '../workspace/Workspace';
 import { utilHelper } from '../helpers/UtilHelper';
 import { FilterTrue } from '../batch/Filter/FilterTrue';
 import { modelProvider } from './ModelProvider';
+import { broadcastManager } from '../broadcastManager/BroadcastManager';
 
 class TreeService {
   private updateStatus(paths: Array<string>, status: NodeStatus) {
@@ -21,8 +22,7 @@ class TreeService {
   }
 
   public updateStart(): void {
-    const project = workspace.getOpenedProjects()[0];
-    project.getTree().sendToUI(IpcChannels.TREE_UPDATING, {});
+    broadcastManager.get().send(IpcChannels.TREE_UPDATING, {});
   }
 
   public updateDone(): void {
@@ -30,22 +30,16 @@ class TreeService {
     project.updateTree();
   }
 
-  public async updateTree(ids: Array<number>, status: NodeStatus): Promise<boolean> {
+  public async updateTree(ids: Array<number>, status: NodeStatus): Promise<void> {
     this.updateStart();
-    return modelProvider.model.result
-      .getSummaryByids(ids)
-      .then((results) => {
-        const paths = utilHelper.getArrayFromObjectFilter(results, 'path', new FilterTrue()) as Array<string>;
-        this.updateStatus(paths, status);
-        this.updateDependencyStatus();
-        return true;
-      })
-      .catch((error) => {
-        throw error;
-      });
+    return modelProvider.model.result.getSummaryByids(ids).then(async (results) => {
+      const paths = utilHelper.getArrayFromObjectFilter(results, 'path', new FilterTrue()) as Array<string>;
+      this.updateStatus(paths, status);
+      return this.updateDependencyStatus();
+    });
   }
 
-  private async getDependencyStatus(): Promise<Array<Record<string, any>>> {
+  public async getDependencyStatus(): Promise<Array<Record<string, any>>> {
     const dependencies = await modelProvider.model.dependency.getStatus(); // getAll
     const dep = this.mapToDependencyStatus(dependencies);
     return dep;
@@ -85,8 +79,8 @@ class TreeService {
     this.updateDependencyStatus();
   }
 
-  private async updateDependencyStatus(): Promise<boolean> {
-    this.getDependencyStatus().then((dep) => {
+  public async updateDependencyStatus(): Promise<void> {
+    return this.getDependencyStatus().then((dep) => {
       const depGroupedByStatus = dep.reduce((acc, item) => {
         if (!acc[item.status]) {
           acc[item.status] = [];
@@ -104,7 +98,6 @@ class TreeService {
       });
       this.updateDone();
     });
-    return true;
   }
 
   public retoreStatus(files: Array<number>) {
@@ -114,7 +107,8 @@ class TreeService {
         .then((files: any) => {
           const paths = utilHelper.getArrayFromObjectFilter(files, 'path', new FilterTrue()) as Array<string>;
           const project = workspace.getOpenedProjects()[0];
-          project.getTree().sendToUI(IpcChannels.TREE_UPDATING, {});
+          // project.getTree().sendToUI(IpcChannels.TREE_UPDATING, {});
+          broadcastManager.get().send(IpcChannels.TREE_UPDATING, {});
           project.getTree().restoreStatus(paths);
           project.updateTree();
           return true;
@@ -128,7 +122,6 @@ class TreeService {
       throw e;
     }
   }
-
 }
 
 export const treeService = new TreeService();

@@ -1,27 +1,25 @@
-import { workspace } from '../workspace/Workspace';
+import { ComponentReportResponse, ReportSummary } from '../../api/types';
 import { modelProvider } from './ModelProvider';
+import { ComponentReportVisitor } from '../modules/report/components/ComponentReportVisitor';
+import { ReportComponentIdentified } from '../modules/report/components/ReportComponentIndentified';
+import { ReportComponentDetected } from '../modules/report/components/ReportComponentDetected';
 
-interface LicenseEntry {
-  label: string;
-  components: any[];
-  value: number;
-  incompatibles: string[];
-  has_incompatibles: string[];
-  copyleft: boolean;
-  patent_hints: boolean;
-}
-interface CryptoEntry {
-  label: string;
-  value: number;
-  files: any[];
+export interface ReportComponent {
+  name: string,
+  url: string,
+  vendor: string,
+  purl: string,
+  version: string,
+  source: string,
+  cryptography: Array<CryptographyAlgorithms> | [],
+  manifestFiles?: Array<string>;
+  licenses: Array<string>,
+  fileCount?: number;
 }
 
-interface InventoryProgress {
-  totalFiles: number;
-  scannedFiles: number;
-  excludedFiles: number;
-  detectedComponents: number;
-  acceptedComponents: number;
+export interface CryptographyAlgorithms {
+  algorithm: string,
+  strength: string,
 }
 
 export interface ISummary {
@@ -39,7 +37,38 @@ export interface ISummary {
   original: number;
 }
 
+export interface LicenseReport {
+  label: string,
+  value: number;
+}
+
+export interface IReportData {
+  licenses: Array<LicenseReport>;
+  vulnerabilities: {
+    critical: number;
+    high: number;
+    low: number;
+    medium: number;
+  };
+  cryptographies: {
+    sbom: number;
+    local: number;
+  }
+  dependencies: {
+    files: any; // FIX TYPE
+    total: number;
+  }
+}
+
 class ReportService {
+  private getVulnerabilitiesReport(vulnerabilities: any) {
+    const vulnerabilityReportMapper: Record<string, number> = vulnerabilities.reduce((acc, curr) => {
+      if (!acc[curr.severity.toLowerCase()]) acc[curr.severity.toLowerCase()] = curr.count;
+      return acc;
+    }, {});
+    return vulnerabilityReportMapper;
+  }
+
   public async getReportSummary(): Promise<ISummary> {
     const auxSummary = await modelProvider.model.file.getSummary();
     const summary: ISummary = {
@@ -59,39 +88,33 @@ class ReportService {
     return summary;
   }
 
-  public async getIdentified() {
-    let data: any = [];
-    data = await modelProvider.model.component.getIdentifiedForReport();
-    const licenses = [];
-    data.forEach((element) => {
-      const aux: any = {};
-      const index = licenses.findIndex((obj) => obj.label === element.spdxid);
-      if (index >= 0) {
-        licenses[index].components.push({
-          name: element.comp_name,
-          vendor: element.vendor,
-          url: element.url,
-          purl: element.purl,
-          version: element.version,
-        });
-        licenses[index].value += 1;
-      } else {
-        aux.components = [];
-        aux.components.push({
-          name: element.comp_name,
-          vendor: element.vendor,
-          url: element.url,
-          purl: element.purl,
-          version: element.version,
-        });
-        aux.value = 1;
-        aux.label = element.spdxid;
-        licenses.push(aux);
-      }
-    });
+  /**
+ *@brief Retrieves a summary of identified data, including licenses, vulnerabilities, cryptographic algorithms, and dependencies.
+ *
+ * This method fetches various types of identified information from the database and compiles a summary report.
+ * It includes identified license components, vulnerability counts categorized by severity, identified cryptographic algorithms,
+ * and identified dependencies.
+ *
+ * @returns {Promise<IReportData>} - A promise that resolves to an object containing:
+ *   - `licenses` (IdentifiedLicenseComponentSummary): Summary of identified license components.
+ *   - `cryptographies` (Object): An object with two properties:
+ *     - `sbom` (number): The number of cryptographic algorithms identified in SBOM.
+ *     - `local` (number): The number of cryptographic algorithms identified locally.
+ *   - `vulnerabilities` (Object): An object with counts of identified vulnerabilities categorized by severity:
+ *     - `critical` (number): Number of critical vulnerabilities.
+ *     - `high` (number): Number of high vulnerabilities.
+ *     - `medium` (number): Number of medium vulnerabilities.
+ *     - `low` (number): Number of low vulnerabilities.
+ *   - `dependencies` (IdentifiedDependenciesSummary): Summary of identified dependencies.
+ *
+ * @throws {Error} - Throws an error if any of the data fetching or processing operations fail.
+ */
+  public async getIdentified(): Promise<IReportData> {
+    // License components summary
+    const identifiedLicenseSummary = await modelProvider.model.report.identifedLicenseComponentSummary();
 
-    const vulnerabilities =
-      await modelProvider.model.vulnerability.getIdentifiedReport();
+    // Vulnerabilities
+    const vulnerabilities = await modelProvider.model.vulnerability.getIdentifiedReport();
     const vulnerabilityReport = {
       critical: 0,
       high: 0,
@@ -100,228 +123,106 @@ class ReportService {
       ...this.getVulnerabilitiesReport(vulnerabilities),
     };
 
-    return { licenses, vulnerabilities: vulnerabilityReport };
+    // Crypto
+    const cryptographies = {
+      sbom: await modelProvider.model.cryptography.identifiedTypeCount(),
+      local: await modelProvider.model.localCryptography.identifiedTypeCount(),
+    };
+
+    // Dependencies
+    const dependenciesSummary = await modelProvider.model.dependency.getIdentifiedSummary();
+
+    return {
+      licenses: identifiedLicenseSummary,
+      vulnerabilities: vulnerabilityReport,
+      cryptographies,
+      dependencies: dependenciesSummary,
+    };
   }
 
-  public async getDetected() {
-    try {
-      const results = await modelProvider.model.result.getDetectedReport();
-      let licenses = this.getLicenseReportFromResults(results);
-      const crypto = await this.getCryptoFromResults();
+  /**
+ * @brief Retrieves a summary of detected data, including licenses, vulnerabilities, dependencies, and cryptographic algorithms.
+ * This method gathers various types of detected information from the database and compiles a summary report.
+ * It includes detected license components, vulnerability counts categorized by severity, detected dependencies,
+ * and cryptographic algorithms both from SBOM (Software Bill of Materials) and local sources.
+ *
+ * @returns {Promise<IReportData>} - A promise that resolves to an object containing:
+ *   - `licenses` (DetectedLicenseComponentSummary): Summary of detected license components.
+ *   - `cryptographies` (Object): An object with two properties:
+ *     - `sbom` (number): The number of unique cryptographic algorithms found in SBOM.
+ *     - `local` (number): The number of cryptographic algorithms found locally.
+ *   - `vulnerabilities` (Object): An object with counts of detected vulnerabilities categorized by severity:
+ *     - `critical` (number): Number of critical vulnerabilities.
+ *     - `high` (number): Number of high vulnerabilities.
+ *     - `medium` (number): Number of medium vulnerabilities.
+ *     - `low` (number): Number of low vulnerabilities.
+ *   - `dependencies` (DetectedDependenciesSummary): Summary of detected dependencies.
+ *
+ * @throws {Error} - Throws an error if any of the data fetching or processing operations fail.
+ */
+  public async getDetected(): Promise<IReportData> {
+    // License components summary
+    const detectedlicensesSummary = await modelProvider.model.report.detectedLicenseComponentSummary();
 
-      const vulnerabilities =
-        await modelProvider.model.vulnerability.getDetectedReport();
-      const vulnerabilityReport = {
-        critical: 0,
-        high: 0,
-        low: 0,
-        medium: 0,
-        ...this.getVulnerabilitiesReport(vulnerabilities),
-      };
+    // Vulnerabilities
+    const vulnerabilities = await modelProvider.model.vulnerability.getDetectedReport();
+    const vulnerabilityReport = {
+      critical: 0,
+      high: 0,
+      low: 0,
+      medium: 0,
+      ...this.getVulnerabilitiesReport(vulnerabilities),
+    };
 
-      const dependencies = await modelProvider.model.dependency.getAll(null);
-      licenses = this.mergeLicenseData(licenses, dependencies);
-      if (licenses) this.checkForIncompatibilities(licenses);
+    // Dependencies
+    const dependenciesSummary = await modelProvider.model.dependency.getDetectedSummary();
 
-      return { licenses, crypto, vulnerabilities: vulnerabilityReport };
-    } catch (e) {
-      console.log('Catch an error: ', e);
-      return { status: 'fail' };
-    }
+    // Crypto
+    const cryptographies = {
+      sbom: await modelProvider.model.cryptography.detectedTypeCount(),
+      local: await modelProvider.model.localCryptography.detectedTypeCount(),
+    };
+
+    return {
+      licenses: detectedlicensesSummary,
+      cryptographies,
+      vulnerabilities: vulnerabilityReport,
+      dependencies: dependenciesSummary,
+    };
   }
 
-  private async getCryptoFromResults() {
-    const crypto: CryptoEntry[] = [{ label: 'None', files: [], value: 0 }];
-    const a = await workspace.getOpenedProjects()[0].getResults();
-    for (const [key, results] of Object.entries<any[]>(a)) {
-      for (const result of results) {
-        if (result.id !== 'none') {
-          // Crypto
-          if (
-            result.cryptography !== undefined &&
-            result.cryptography[0] !== undefined
-          ) {
-            if (
-              !crypto.some((l) => l.label === result.cryptography[0].algorithm)
-            ) {
-              const newCrypto = { label: '', files: [], value: 1 };
-              newCrypto.label = result.cryptography[0].algorithm;
-              newCrypto.files.push(result.file);
-              crypto.push(newCrypto);
-            } else {
-              const index = crypto.findIndex(
-                (l) => l.label === result.cryptography[0].algorithm
-              );
-              if (index >= 0) {
-                crypto[index].files.push(result.file);
-                crypto[index].value = crypto[index].files.length;
-              }
-            }
-          } else {
-            const index = crypto.findIndex((l) => l.label === 'None');
-            crypto[index].files.push(result.file);
-
-            crypto[index].value = crypto[index].files.length;
-          }
-        }
-      }
-    }
+  /**
+ *@brief Retrieves a list of detected components and declared components with their associated file counts.
+ * This method fetches the count of files detected for each component and declared dependency.
+ * It then combines this data with details of detected and declared components, and optionally
+ * filters the results by a specified license.
+ *
+ * @param {string} [license] - The license to filter components by. If provided, only components
+ *                             matching this license will be included in the results.
+ * @returns {Promise<ComponentReportResponse>}
+ * @throws {Error} - Throws an error if any of the data fetching or processing operations fail.
+ */
+  public async getDetectedComponents(license?: string): Promise<ComponentReportResponse> {
+    const componentReportVisitor = new ComponentReportVisitor();
+    const reportComponentDetected = new ReportComponentDetected(license);
+    return reportComponentDetected.generate(componentReportVisitor);
   }
 
-  private getLicenseReportFromResults(results: any): Array<LicenseEntry> {
-    const licenses: Record<string, LicenseEntry> = results.reduce(
-      (acc, curr) => {
-        const key = curr.spdxid;
-        if (!acc[key]) {
-          acc[key] = {
-            label: key,
-            value: 1,
-            incompatibles: curr?.incompatible_with
-              ? curr.incompatible_with.split(',')
-              : [],
-            has_incompatibles: [],
-            patent_hints: curr?.patent_hints ? curr.patent_hints : false,
-            copyleft: curr?.copyleft ? curr.copyleft : false,
-            components: [
-              {
-                name: curr.name,
-                vendor: curr.vendor,
-                version: curr.version,
-                purl: curr.purl,
-              },
-            ],
-          };
-        } else {
-          const componentIndex = acc[key].components.findIndex(
-            (c) => c.purl === curr.purl && c.version === curr.version
-          );
-          if (componentIndex < 0) {
-            acc[key].value += 1;
-            acc[key].components.push({
-              name: curr.name,
-              vendor: curr.vendor,
-              version: curr.version,
-              purl: curr.purl,
-            });
-          }
-        }
-        return acc;
-      },
-      {}
-    );
-    Object.entries(licenses).forEach(([key, value]) => {
-      value.value = value.components.length;
-    });
-    return Object.values(licenses);
-  }
-
-  private getVulnerabilitiesReport(vulnerabilities: any) {
-    const vulnerabilityReportMapper: Record<string, number> =
-      vulnerabilities.reduce((acc, curr) => {
-        if (!acc[curr.severity.toLowerCase()])
-          acc[curr.severity.toLowerCase()] = curr.count;
-        return acc;
-      }, {});
-    return vulnerabilityReportMapper;
-  }
-
-  private checkForIncompatibilities(licenses: LicenseEntry[]) {
-    for (let l = 0; l < licenses.length; l += 1) {
-      const license = licenses[l];
-      if (license.incompatibles !== undefined)
-        for (let i = 0; i < license.incompatibles.length; i += 1) {
-          if (licenses.some((lic) => lic.label === license.incompatibles[i]))
-            license.has_incompatibles.push(license.incompatibles[i]);
-        }
-    }
-  }
-
-  private mergeLicenseData(
-    licenses: LicenseEntry[],
-    dependencies: Array<any>
-  ): Array<LicenseEntry> {
-    const licenseMapper = licenses.reduce((acc, curr) => {
-      if (!acc[curr.label]) acc[curr.label] = curr;
-      return acc;
-    }, {} as any);
-
-    dependencies.forEach((dep) => {
-      // We don't know what is the license
-      if (!dep.originalLicense) {
-        if (!licenseMapper.unknown) {
-          licenseMapper.unknown = {
-            components: [
-              {
-                name: dep.component !== '' ? dep.component : dep.purl,
-                vendor: null,
-                version: dep.version,
-                purl: dep.purl,
-              },
-            ],
-            label: 'unknown',
-            value: 1,
-            incompatibles: [],
-            has_incompatibles: [],
-            patent_hints: false,
-            copyleft: false,
-          };
-        } else {
-          licenseMapper.unknown.components.push({
-            name: dep.component !== '' ? dep.component : dep.purl,
-            vendor: null,
-            version: dep.version,
-            purl: dep.purl,
-          });
-          licenseMapper.unknown.value += 1;
-        }
-      } else {
-        dep.originalLicense?.forEach((l) => {
-          // if license already exists in the license mapper
-          if (licenseMapper[l]) {
-            const componentIndex = licenseMapper[l].components.findIndex(
-              (c) => c.purl === dep.purl && c.version === dep.version
-            );
-            // check if the component already exists in the component array
-            if (componentIndex < 0) {
-              licenseMapper[l].components.push({
-                name: dep.componentName,
-                vendor: null,
-                version: dep.version,
-                purl: dep.purl,
-              });
-              licenseMapper[l].value += 1;
-            }
-          } // The license not exists in license mapper
-          else {
-            licenseMapper[l] = {
-              components: [
-                {
-                  name: dep.componentName,
-                  vendor: null,
-                  version: dep.version,
-                  purl: dep.purl,
-                },
-              ],
-              label: l,
-              value: 1,
-              incompatibles: [],
-              has_incompatibles: [],
-              patent_hints: false,
-              copyleft: false,
-            };
-          }
-        });
-      }
-    });
-    // Used to position the unknown license element to the end of the array
-    const licenseArray = Object.values(licenseMapper) as Array<LicenseEntry>;
-    if (licenseMapper.unknown) {
-      const index = licenseArray.findIndex((l) => l.label === 'unknown');
-      const aux = licenseArray[index];
-      licenseArray.splice(index, 1);
-      licenseArray.push(aux);
-    }
-    return licenseArray as Array<LicenseEntry>;
+  /**
+ *@brief Retrieves identified components with their associated file counts, optionally filtering by license.
+ * This method fetches identified components from the database and adds file count data
+ * for each component based on its source ('detected' or 'declared'). It then filters the results
+ * by a specified license if provided.
+ *
+ * @param {string} [license] - The license to filter components by. If provided, only components
+ *                             matching this license will be included in the results.
+ * @returns {Promise<ComponentReportResponse>}
+ * @throws {Error} - Throws an error if any of the data fetching or processing operations fail.
+ */
+  public async getIdentifiedComponents(license?: string): Promise<ComponentReportResponse> {
+    const componentReportVisitor = new ComponentReportVisitor();
+    const identifiedComponents = new ReportComponentIdentified(license);
+    return identifiedComponents.generate(componentReportVisitor);
   }
 }
 

@@ -42,10 +42,15 @@
   "ExportHintRAW": "Exportar las respuestas JSON sin procesar desde la Plataforma SCANOSS",
   "ExportHintCSV": "Exportar informe en formato CSV",
   "ExportHintSPDXLite": "Exportar informe SBOM en formato SPDX",
-  "ExportHintHTML": "Exportar un resumen HTML del informe de identificación",
+  "ExportHintHTML": "Exportar un resumen HTML del informe",
   "TotalFiles": "Ficheros totales",
   "Detected": "Detectados",
   "NotDetected": "No detectados",
   "Ignored": "Ignorados",
-  "Progress": "Progreso"
+  "Progress": "Progreso",
+  "OpenInReadMode": "Abrir en modo lectura",
+  "ExportHintSettings": "Exportar archivo de configuracion",
+  "ExportCSVVulnerability": "Exportar reporte de vulnerabilidades",
+  "ExportHintCycloneDXVulnerabilities": "Exportar informe en formato CycloneDX con vulnerabilities",
+  "ExportHintBOM": "Exportar la lista de materiales (BOM)"
 }

@@ -1,11 +1,16 @@
-import { ipcMain } from 'electron';
 import log from 'electron-log';
+import sqlite3 from 'sqlite3';
 import {
   ExtractFromProjectDTO,
   FileTreeViewMode,
-  INewProject, Inventory,
+  INewProject,
+  Inventory,
   InventoryKnowledgeExtraction,
-  IWorkbenchFilter, ReuseIdentificationTaskDTO
+  IProject,
+  IWorkbenchFilter,
+  ProjectAccessMode,
+  ProjectOpenResponse,
+  ReuseIdentificationTaskDTO,
 } from '../types';
 import { IpcChannels } from '../ipc-channels';
 import { Response } from '../Response';
@@ -16,19 +21,27 @@ import { workspace } from '../../main/workspace/Workspace';
 import { dependencyService } from '../../main/services/DependencyService';
 import { searcher } from '../../main/modules/searchEngine/searcher/Searcher';
 import { projectService } from '../../main/services/ProjectService';
+import api from '../api';
+import { modelProvider } from '../../main/services/ModelProvider';
 
-ipcMain.handle(IpcChannels.PROJECT_OPEN_SCAN, async (event, arg: any) => {
+api.handle(IpcChannels.PROJECT_OPEN_SCAN, async (event, payload: any) => {
   // TODO: factory to create filters depending on arguments
-  const p: Project = await workspace.openProject(new ProjectFilterPath(arg));
+  modelProvider.openModeProjectModel = payload.mode === ProjectAccessMode.READ_ONLY ? sqlite3.OPEN_READONLY : sqlite3.OPEN_READWRITE;
+
+  const p: Project = await workspace.openProject(new ProjectFilterPath(payload.path));
   searcher.closeIndex();
-  const response = {
+  // await projectService.lockProject(p.getProjectName(), mode);
+  const response: ProjectOpenResponse = {
     logical_tree: p.getTree().getRootFolder(),
-    work_root: p.getMyPath(),
+    work_root: p.getWorkRoot(),
     scan_root: p.getScanRoot(),
+    sourceCodePath: p.getSourceCodePath(),
     dependencies: Array.from(await dependencyService.getDependenciesFiles()),
     uuid: p.getUUID(),
     source: p.getDto().source,
     metadata: p.metadata,
+    mode: payload.mode,
+    ...(payload.lockedBy && { lockedBy: payload.lockedBy }),
   };
   return {
     status: 'ok',
@@ -42,7 +55,7 @@ function getUserHome() {
   return process.env[process.platform === 'win32' ? 'USERPROFILE' : 'HOME'];
 }
 
-ipcMain.handle(IpcChannels.PROJECT_STOP_SCAN, async (_event) => {
+api.handle(IpcChannels.PROJECT_STOP_SCAN, async (_event) => {
   const projectList = workspace.getOpenedProjects();
   let pPromises = [];
   for (const p of projectList) pPromises.push(p.save());
@@ -53,33 +66,27 @@ ipcMain.handle(IpcChannels.PROJECT_STOP_SCAN, async (_event) => {
   await Promise.all(pPromises);
 });
 
-ipcMain.handle(
-  IpcChannels.PROJECT_RESUME_SCAN,
-  async (event, projectPath: string) => {
-    try {
-      await projectService.resume(projectPath);
-      return Response.ok();
-    } catch (error: any) {
-      console.error(error);
-      return Response.fail({ message: error.message });
-    }
+api.handle(IpcChannels.PROJECT_RESUME_SCAN, async (event, payload: any) => {
+  try {
+    await projectService.resume(payload.path);
+    return Response.ok();
+  } catch (error: any) {
+    console.error(error);
+    return Response.fail({ message: error.message });
   }
-);
+});
 
-ipcMain.handle(
-  IpcChannels.PROJECT_RESCAN,
-  async (event, projectPath: string) => {
-    try {
-      await projectService.reScan(projectPath);
-      return Response.ok();
-    } catch (error: any) {
-      console.error(error);
-      return Response.fail({ message: error.message });
-    }
+api.handle(IpcChannels.PROJECT_RESCAN, async (event, payload: any) => {
+  try {
+    await projectService.reScan(payload.path);
+    return Response.ok();
+  } catch (error: any) {
+    console.error(error);
+    return Response.fail({ message: error.message });
   }
-);
+});
 
-ipcMain.handle(IpcChannels.UTILS_PROJECT_NAME, async (event) => {
+api.handle(IpcChannels.UTILS_PROJECT_NAME, async (event) => {
   const projectName = workspace.getOpenedProjects()[0].project_name;
   return {
     status: 'ok',
@@ -88,7 +95,7 @@ ipcMain.handle(IpcChannels.UTILS_PROJECT_NAME, async (event) => {
   };
 });
 
-ipcMain.handle(IpcChannels.UTILS_GET_NODE_FROM_PATH, (event, path: string) => {
+api.handle(IpcChannels.UTILS_GET_NODE_FROM_PATH, (event, path: string) => {
   try {
     const p = workspace.getOpenedProjects()[0];
     const node = p.getTree().getNode(path);
@@ -101,7 +108,7 @@ ipcMain.handle(IpcChannels.UTILS_GET_NODE_FROM_PATH, (event, path: string) => {
   }
 });
 
-ipcMain.handle(IpcChannels.GET_TOKEN, async (event) => {
+api.handle(IpcChannels.GET_TOKEN, async (event) => {
   try {
     let token = workspace.getOpenedProjects()[0].getToken();
     if (!token || token === '') {
@@ -117,7 +124,7 @@ ipcMain.handle(IpcChannels.GET_TOKEN, async (event) => {
   }
 });
 
-ipcMain.handle(IpcChannels.PROJECT_READ_TREE, (event) => {
+api.handle(IpcChannels.PROJECT_READ_TREE, (event) => {
   try {
     const tree = workspace.getOpenedProjects()[0].getTree().getRootFolder();
     return Response.ok({ message: 'Tree read successfully', data: tree });
@@ -126,33 +133,45 @@ ipcMain.handle(IpcChannels.PROJECT_READ_TREE, (event) => {
   }
 });
 
-ipcMain.handle(
-  IpcChannels.PROJECT_SET_FILTER,
-  async (event, filter: IWorkbenchFilter) => {
-    try {
-      const p = workspace.getOpenedProjects()[0];
-      await p.setGlobalFilter(filter);
-      return Response.ok({ message: 'Filter setted succesfully', data: true });
-    } catch (e: any) {
-      return Response.fail({ message: e.message });
-    }
+api.handle(IpcChannels.PROJECT_SET_FILTER, async (event, filter: IWorkbenchFilter) => {
+  try {
+    const p = workspace.getOpenedProjects()[0];
+    await p.setGlobalFilter(filter);
+    return Response.ok({ message: 'Filter setted succesfully', data: true });
+  } catch (e: any) {
+    return Response.fail({ message: e.message });
   }
-);
+});
 
-ipcMain.handle(
-  IpcChannels.PROJECT_SET_FILE_TREE_VIEW_MODE,
-  async (event, mode: FileTreeViewMode) => {
-    try {
-      const p = workspace.getOpenedProjects()[0];
-      p.setFileTreeViewMode(mode);
-      return Response.ok({ message: 'Filter setted successfully', data: true });
-    } catch (e: any) {
-      return Response.fail({ message: e.message });
-    }
+api.handle(IpcChannels.PROJECT_SET_FILE_TREE_VIEW_MODE, async (event, mode: FileTreeViewMode) => {
+  try {
+    const p = workspace.getOpenedProjects()[0];
+    p.setFileTreeViewMode(mode);
+    return Response.ok({ message: 'Filter setted successfully', data: true });
+  } catch (e: any) {
+    return Response.fail({ message: e.message });
   }
-);
+});
 
-ipcMain.handle(IpcChannels.GET_API_KEY, async (event) => {
+api.handle(IpcChannels.GET_API_URL, async (event) => {
+  try {
+    const p = workspace.getOpenProject();
+    let apiURL = p.getApi();
+    if (apiURL === undefined) {
+      const { APIS, DEFAULT_API_INDEX } = userSettingService.get();
+      if (DEFAULT_API_INDEX > 0) apiURL = APIS[DEFAULT_API_INDEX].URL;
+      else apiURL = null;
+    }
+    return Response.ok({
+      message: 'Api URL loaded successfully',
+      data: apiURL,
+    });
+  } catch (e: any) {
+    return Response.fail({ message: e.message });
+  }
+});
+
+api.handle(IpcChannels.GET_API_KEY, async (event) => {
   try {
     const p = workspace.getOpenProject();
     let apiKey = p.getApiKey();
@@ -170,20 +189,17 @@ ipcMain.handle(IpcChannels.GET_API_KEY, async (event) => {
   }
 });
 
-ipcMain.handle(
-  IpcChannels.PROJECT_CREATE,
-  async (_event, projectDTO: INewProject) => {
-    try {
-      await projectService.createProject(projectDTO);
-      return Response.ok();
-    } catch (error: any) {
-      log.error('[CREATE PROJECT]', error);
-      return Response.fail({ message: error.message });
-    }
+api.handle(IpcChannels.PROJECT_CREATE, async (_event, projectDTO: INewProject) => {
+  try {
+    await projectService.createProject(projectDTO);
+    return Response.ok();
+  } catch (error: any) {
+    log.error('[CREATE PROJECT]', error);
+    return Response.fail({ message: error.message });
   }
-);
+});
 
-ipcMain.handle(IpcChannels.PROJECT_EXTRACT_INVENTORY_KNOWLEDGE, async (_event, param: ExtractFromProjectDTO) => {
+api.handle(IpcChannels.PROJECT_EXTRACT_INVENTORY_KNOWLEDGE, async (_event, param: ExtractFromProjectDTO) => {
   try {
     const inventoryKnowledgeExtraction: InventoryKnowledgeExtraction = await projectService.extractProjectKnowledgeInventoryData(param);
     return Response.ok({
@@ -196,7 +212,7 @@ ipcMain.handle(IpcChannels.PROJECT_EXTRACT_INVENTORY_KNOWLEDGE, async (_event, p
   }
 });
 
-ipcMain.handle(IpcChannels.PROJECT_ACCEPT_INVENTORY_KNOWLEDGE, async (_event, param: ReuseIdentificationTaskDTO) => {
+api.handle(IpcChannels.PROJECT_ACCEPT_INVENTORY_KNOWLEDGE, async (_event, param: ReuseIdentificationTaskDTO) => {
   try {
     const inventories: Array<Inventory> = await projectService.acceptInventoryKnowledge(param);
     return Response.ok({
@@ -205,6 +221,19 @@ ipcMain.handle(IpcChannels.PROJECT_ACCEPT_INVENTORY_KNOWLEDGE, async (_event, pa
     });
   } catch (error: any) {
     log.error('[PROJECT_EXTRACT_INVENTORY_KNOWLEDGE]', error);
+    return Response.fail({ message: error.message });
+  }
+});
+
+api.handle(IpcChannels.PROJECT_CURRENT_CLOSE, async (_event) => {
+  try {
+    const project: IProject = await projectService.close();
+    return Response.ok({
+      message: 'Project Closed',
+      data: project,
+    });
+  } catch (error: any) {
+    log.error('[PROJECT_CURRENT_CLOSE]', error);
     return Response.fail({ message: error.message });
   }
 });

@@ -7,6 +7,16 @@ import { migration110 } from './scripts/110';
 import { migration120 } from './scripts/120';
 import { migration140 } from './scripts/140';
 import { migration150 } from './scripts/150';
+import { migration180 } from './scripts/180';
+import { projectMigration183 } from './scripts/183';
+import { projectMigration190 } from './scripts/0190';
+import { projectMigration193 } from './scripts/0193';
+import { projectMigration1124 } from './scripts/1.12.4';
+import { projectMigration1130 } from './scripts/1.13.0';
+import { projectMigration1161 } from './scripts/1.16.1';
+import { projectMigration1170 } from './scripts/1.17.0';
+import { projectMigration1180 } from './scripts/1.18.0';
+import { projectMigration1190 } from './scripts/1.19.0';
 
 export class ProjectMigration extends Migration {
   private scripts: Record<string, Array<(data: string) => void>>;
@@ -26,6 +36,16 @@ export class ProjectMigration extends Migration {
       '1.2.0': [migration120],
       '1.4.0': [migration140],
       '1.5.0': [migration150], // Max version supported
+      '1.8.0': [migration180],
+      '1.8.3': [projectMigration183],
+      '1.9.0': [projectMigration190],
+      '1.9.3': [projectMigration193],
+      '1.12.4': [projectMigration1124],
+      '1.13.0': [projectMigration1130],
+      '1.16.1': [projectMigration1161],
+      '1.17.0': [projectMigration1170],
+      '1.18.0': [projectMigration1180],
+      '1.19.0': [projectMigration1190],
     };
   }
 

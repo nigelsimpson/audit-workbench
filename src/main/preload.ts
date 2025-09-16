@@ -1,30 +1,26 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
+import { IpcChannels } from '@api/ipc-channels';
 import * as os from 'os';
 import path from 'path';
-import {IpcChannels} from "@api/ipc-channels";
 
 const { shell } = require('electron');
 
-export type Channels = 'ipc-example';
-
 contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
-    send(channel: Channels, ...args: any[]) {
+    send(channel: IpcChannels, ...args: any[]) {
       ipcRenderer.send(channel, ...args);
     },
-    on(channel: Channels, listener: (_event: IpcRendererEvent, ...args: any[]) => void) {
-      // const subscription = (_event: IpcRendererEvent, ...args: unknown[]) => listener(_event, ...args);
+    on(channel: IpcChannels, listener: (_event: IpcRendererEvent, ...args: any[]) => void) {
       ipcRenderer.on(channel, listener);
-
       return () => ipcRenderer.removeListener(channel, listener);
     },
-    once(channel: Channels, listener: (...args: any[]) => void) {
+    once(channel: IpcChannels, listener: (...args: any[]) => void) {
       ipcRenderer.once(channel, (_event, ...args) => listener(...args)); // TODO: use event
     },
-    invoke(channel: string, ...args: any[]): Promise<any> {
+    invoke(channel: IpcChannels, ...args: any[]): Promise<any> {
       return ipcRenderer.invoke(channel, ...args);
     },
-    removeListener(channel: string, listener: (...args: any[]) => void) {
+    removeListener(channel: IpcChannels, listener: (...args: any[]) => void) {
       // const subscription = (_event: IpcRendererEvent, ...args: any) => func(...args);
       ipcRenderer.removeListener(channel, listener);
     },
@@ -32,21 +28,20 @@ contextBridge.exposeInMainWorld('electron', {
 });
 
 contextBridge.exposeInMainWorld('os', {
-  homedir: () => {
-    return os.homedir();
-  },
+  homedir: () => os.homedir(),
 });
 
 contextBridge.exposeInMainWorld('path', {
-  resolve: (p: string, s: string) => {
-    return path.resolve(p, s);
-  },
+  resolve: (p: string, s: string) => path.resolve(p, s),
   sep: path.sep,
   basename: (filepath, extension) => path.basename(filepath, extension),
   dirname: (filepath) => path.dirname(filepath),
 });
 
 contextBridge.exposeInMainWorld('shell', {
+  openPath: (p: string) => {
+    shell.openPath(p);
+  },
   showItemInFolder: (p: string) => {
     shell.showItemInFolder(p);
   },
@@ -56,7 +51,5 @@ contextBridge.exposeInMainWorld('shell', {
 });
 
 contextBridge.exposeInMainWorld('app', {
-  getInfo: async () => {
-    return ipcRenderer.invoke(IpcChannels.APP_GET_APP_INFO);
-  },
+  getInfo: async () => ipcRenderer.invoke(IpcChannels.APP_GET_APP_INFO),
 });

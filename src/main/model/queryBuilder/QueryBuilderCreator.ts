@@ -30,6 +30,9 @@ export class QueryBuilderCreator {
       if (params.usage) {
         builder.add(new QueryBuilderUsage(params.usage));
       }
+      if (params.inventoryUsage) {
+        builder.add(new QueryBuilderCustom('usage', '=', params.inventoryUsage));
+      }
       if (params.purl) {
         builder.add(new QueryBuilderCustom('purl', '=', params.purl));
       }
@@ -60,7 +63,7 @@ export class QueryBuilderCreator {
         queryBuilderIN.add(new QueryBuilderFIlePathIN(params.paths));
         return queryBuilderIN;
       }
-      if(params.md5){
+      if (params.md5) {
         const queryBuilderMD5 = new QueryBuilderMD5FileIn(params.md5);
         builder.add(queryBuilderMD5);
       }

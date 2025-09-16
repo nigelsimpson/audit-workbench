@@ -14,7 +14,6 @@ import deleteSourceMaps from '../scripts/delete-source-maps';
 
 checkNodeEnv('production');
 deleteSourceMaps();
-
 const configuration: webpack.Configuration = {
   devtool: 'source-map',
 
@@ -25,6 +24,7 @@ const configuration: webpack.Configuration = {
   entry: {
     main: path.join(webpackPaths.srcMainPath, 'main.ts'),
     preload: path.join(webpackPaths.srcMainPath, 'preload.ts'),
+    scanner: path.join(webpackPaths.srcMainPath, '/threads/scanner.ts'),
   },
 
   output: {
@@ -39,7 +39,7 @@ const configuration: webpack.Configuration = {
         terserOptions: {
           keep_classnames: /AbortSignal/,
           keep_fnames: /AbortSignal/,
-        }
+        },
       }),
     ],
   },

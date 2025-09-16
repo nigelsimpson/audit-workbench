@@ -15,7 +15,15 @@
     "Copyleft": "Copyleft",
     "IncompatibleLicenses": "Licencias incompatibles",
     "PURL": "PURL",
-    "URL": "URL"
+    "URL": "URL",
+    "LocalFile": "Fichero local",
+    "Algorithm": "Algoritmo",
+    "Strength ": "Strength",
+    "File": "Fichero",
+    "Dependencies ": "Dependencias",
+    "Cryptography": "Criptografia",
+    "Type": "Tipo",
+    "Detected": "Detectado"
   },
   "Version": "Versión",
   "License": "Licencia"

@@ -1,8 +1,7 @@
 import React, { useContext, useEffect, useRef } from 'react';
-import { Chip, IconButton, TextField } from '@mui/material';
-import { makeStyles } from '@mui/styles';
+import { Chip, IconButton, styled, TextField } from '@mui/material';
 import { IpcChannels } from '@api/ipc-channels';
-import { DataGrid } from '@mui/x-data-grid';
+import { DataGrid, GridPaginationModel } from '@mui/x-data-grid';
 import { useNavigate } from 'react-router-dom';
 import Autocomplete from '@mui/material/Autocomplete';
 import * as SearchUtils from '@shared/utils/search-utils';
@@ -13,75 +12,61 @@ import useBatch from '@hooks/useBatch';
 import { selectWorkbench } from '@store/workbench-store/workbenchSlice';
 import { useTranslation } from 'react-i18next';
 import TreeNode from '../TreeNode/TreeNode';
+import { KeywordGroupMenu } from '../KeywordGroupMenu/KeywordGroupMenu';
+import { GroupSearchKeyword } from '@api/types';
+import TocOutlinedIcon from '@mui/icons-material/TocOutlined';
 
-const useStyles = makeStyles((theme) => ({
-  button: {
-    position: 'absolute',
-    top: 9,
-    right: 9,
-    zIndex: 1,
-  },
-  autocomplete: {
-    '& .MuiAutocomplete-endAdornment': {},
-  },
-  searchInput: {
-    '& .MuiInputBase-input': {
-      fontSize: '0.8rem',
-      padding: '7px 0px !important',
+// For the data grid
+const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
+  '& .MuiDataGrid-columnHeader': {
+    fontSize: '12px',
+    fontWeight: '400 !important',
+    padding: 0,
+    '& .MuiDataGrid-columnSeparator': {
+      display: 'none',
     },
   },
-  dataGrid: {
-    '& .MuiDataGrid-columnHeader': {
-      fontSize: '12px',
-      fontWeight: '400 !important',
-      padding: 0,
-      '& .MuiDataGrid-columnSeparator': {
-        display: 'none',
-      },
+  '& .MuiDataGrid-columnHeaderCheckbox': {
+    '& .MuiSvgIcon-root': {
+      width: '0.85em',
+      height: '0.85em',
     },
-    '& .MuiDataGrid-columnHeaderCheckbox': {
-      '& .MuiSvgIcon-root': {
-        width: '0.85em',
-        height: '0.85em',
-      },
+  },
+  '& .MuiTablePagination-caption': {
+    fontSize: '0.8rem',
+    fontWeight: 500,
+  },
+  '& .MuiTablePagination-actions': {
+    marginLeft: 10,
+  },
+  border: 2,
+  '& .MuiDataGrid-cell': {
+    border: 0,
+    padding: '0 3px',
+  },
+  '& .MuiDataGrid-cell.MuiDataGrid-cellCheckbox': {
+    visibility: 'hidden',
+    '& .MuiSvgIcon-root': {
+      width: '0.85em',
+      height: '0.85em',
     },
-    '& .MuiTablePagination-caption': {
-      fontSize: '0.8rem',
-      fontWeight: 500,
-    },
-    '& .MuiTablePagination-actions': {
-      marginLeft: 10,
-    },
-    border: 2,
-    '& .MuiDataGrid-cell': {
-      border: 0,
-      padding: '0 3px',
-    },
+  },
+  '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell.MuiDataGrid-cellCheckbox': {
+    visibility: 'visible !important',
+  },
+  '& .MuiDataGrid-row:hover': {
     '& .MuiDataGrid-cell.MuiDataGrid-cellCheckbox': {
-      visibility: 'hidden',
-
-      '& .MuiSvgIcon-root': {
-        width: '0.85em',
-        height: '0.85em',
-      },
+      visibility: 'visible',
     },
-    '& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell.MuiDataGrid-cellCheckbox': {
-      visibility: 'visible !important',
-    },
-    '& .MuiDataGrid-row:hover': {
-      '& .MuiDataGrid-cell.MuiDataGrid-cellCheckbox': {
-        visibility: 'visible',
-      },
-    },
-    '& .MuiButtonBase-root ': {
-      padding: 0,
-    },
+  },
+  '& .MuiButtonBase-root ': {
+    padding: 0,
   },
 }));
 
+
 const SearchPanel = () => {
   const navigate = useNavigate();
-  const classes = useStyles();
   const searchQuery = useRef(null);
   const { summary } = useSelector(selectWorkbench);
   const { t } = useTranslation();
@@ -91,11 +76,14 @@ const SearchPanel = () => {
   const dialogCtrl = useContext(DialogContext) as IDialogContext;
 
   const serverPage = useRef(0);
-  const [localPage, setLocalPage] = React.useState(0);
+  const [paginationModel, setPaginationModel] = React.useState({ page: 0, pageSize: 100 });
 
   const [value, setValue] = React.useState<string[]>([]);
   const [results, setResults] = React.useState<any[]>([]);
   const [selected, setSelected] = React.useState<any[]>([]);
+  const [isOpenGroupKeywordDialog, setOpenKeywordDialog] = React.useState<boolean>(false);
+
+
   const refSelected = useRef([]);
   const refResults = useRef([]);
 
@@ -118,16 +106,23 @@ const SearchPanel = () => {
 
   const onTagsHandler = (tags: string[]) => {
     serverPage.current = 0;
-    setLocalPage(0);
+    setPaginationModel({ page: 0, pageSize: 100 });
 
     const nTags = tags
-      .map((tag) => tag.toLowerCase().trim())
-      .map((tag) => SearchUtils.getTerms(tag))
-      .flat();
-
+    .map((tag) => tag.toLowerCase().trim())
+    .map((tag) => SearchUtils.getTerms(tag))
+    .flat();
     searchQuery.current = nTags.join(' ');
     setValue(nTags);
   };
+
+  const sanitizeTags = (tags: string[]) => {
+    const nTags = tags
+    .map((tag) => tag.toLowerCase().trim())
+    .map((tag) => SearchUtils.getTerms(tag))
+    .flat();
+    return nTags;
+  }
 
   const onSearchResponse = (event, data) => {
     setResults(serverPage.current === 0 ? (oldState) => [...data] : (oldState) => [...oldState, ...data]);
@@ -180,14 +175,20 @@ const SearchPanel = () => {
     window.electron.ipcRenderer.send(IpcChannels.DIALOG_BUILD_CUSTOM_POPUP_MENU, menu);
   };
 
-  const onPageChangeHandler = (localPageNumber, details) => {
-    setLocalPage(localPageNumber);
-    const nextPageServer = Math.floor((localPageNumber + 1) / (AppConfigDefault.SEARCH_ENGINE_DEFAULT_LIMIT / 100));
+  const onPaginationModelChangeHandler = (model: GridPaginationModel) => {
+    setPaginationModel(model);
+    const nextPageServer = Math.floor((model.page + 1) / (AppConfigDefault.SEARCH_ENGINE_DEFAULT_LIMIT / 100));
     if (nextPageServer > serverPage.current) {
       serverPage.current = nextPageServer;
       search();
     }
   };
+
+  const handleGroupKeyword = (group: GroupSearchKeyword) => {
+    const nTags = sanitizeTags(group.words);
+    searchQuery.current = nTags.join(' ');
+    setValue(nTags);
+};
 
   // trigger the search on value change
   useEffect(() => {
@@ -206,12 +207,23 @@ const SearchPanel = () => {
     return () => subscriptions.forEach((unsubscribe) => unsubscribe());
   };
 
+  const openMenu = () =>{
+    setOpenKeywordDialog(true);
+  }
+
+  const closeMenu = () =>{
+    setOpenKeywordDialog(false);
+  }
+
+
   useEffect(() => {
     search();
   }, [summary]);
 
   // setup listeners
-  useEffect(setupListeners, []);
+  useEffect(() => {
+    setupListeners();
+   } ,[]);
 
   return (
     <div className="panel panel-left search-panel-container">
@@ -223,7 +235,6 @@ const SearchPanel = () => {
           <div className="search-panel-input d-flex align-center">
             <i className="ri-search-line mr-1" />
             <Autocomplete
-              className={classes.autocomplete}
               multiple
               fullWidth
               size="small"
@@ -243,11 +254,12 @@ const SearchPanel = () => {
                   />
                 ))
               }
-              onChange={(event, data) => onTagsHandler(data)}
+              onChange={(event, data) => {
+                onTagsHandler(data)
+              }}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  className={classes.searchInput}
                   autoFocus
                   variant="standard"
                   InputProps={{
@@ -258,20 +270,32 @@ const SearchPanel = () => {
                 />
               )}
             />
+            <div>
+              <IconButton
+                title={t('NewGroup')}
+                onClick={openMenu} >
+                <TocOutlinedIcon></TocOutlinedIcon>
+              </IconButton>
+              <KeywordGroupMenu onValueChange={handleGroupKeyword} open={isOpenGroupKeywordDialog} close={closeMenu}></KeywordGroupMenu>
+            </div>
           </div>
         </div>
       </header>
-      <main className="panel-body">
+      <main className="panel-body" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <IconButton
           disabled={selected?.length === 0}
           size="small"
-          className={classes.button}
+          sx={{
+            position: 'absolute',
+            top: 9,
+            right: 9,
+            zIndex: 1,
+          }}
           onClick={onMenuActionHandler}
         >
           <i className="ri-more-line" />
         </IconButton>
-        <DataGrid
-          className={classes.dataGrid}
+        <StyledDataGrid
           rows={results}
           columns={[
             {
@@ -293,17 +317,18 @@ const SearchPanel = () => {
             },
           }}
           rowHeight={23}
-          page={localPage}
+          paginationModel={paginationModel}
+          onPaginationModelChange={onPaginationModelChangeHandler}
+          pageSizeOptions={[100]}
           disableColumnMenu
-          rowsPerPageOptions={[100]}
           hideFooterSelectedRowCount
           checkboxSelection
-          headerHeight={41}
-          disableSelectionOnClick
-          onPageChange={onPageChangeHandler}
+          columnHeaderHeight={41}
+          disableRowSelectionOnClick
           onRowClick={onRowClickHandler}
           onCellKeyDown={onCellKeyDownHandler}
-          onSelectionModelChange={onSelectionHandler}
+          onRowSelectionModelChange={onSelectionHandler}
+          sx={{ flex: 1, overflow: 'hidden' }}
         />
       </main>
       <footer className="panel-footer" />

@@ -1,22 +1,23 @@
-import { ipcMain } from 'electron';
 import log from 'electron-log';
+import { DependencyManifestFile } from '@api/types';
+import api from '../api';
 import { dependencyService } from '../../main/services/DependencyService';
 import { AcceptAllDependeciesDTO, NewDependencyDTO, RejectAllDependeciesDTO, RestoreAllDependenciesDTO } from '../dto';
 import { IpcChannels } from '../ipc-channels';
 import { Response } from '../Response';
 import { treeService } from '../../main/services/TreeService';
 
-ipcMain.handle(IpcChannels.DEPENDENCY_GET_ALL, async (event, params: { path: string }) => {
+api.handle(IpcChannels.DEPENDENCY_GET_ALL, async (event, params: { path: string }) => {
   try {
     const dependencies = await dependencyService.getAll(params);
-    return Response.ok({ message: 'Component created successfully', data: dependencies });
+    return Response.ok({ message: 'Get all dependencies', data: dependencies });
   } catch (error: any) {
     log.error('[DEPENDENCY GET ALL]: ', error, params);
     return Response.fail({ message: error.message });
   }
 });
 
-ipcMain.handle(IpcChannels.DEPENDENCY_ACCEPT, async (event, params: NewDependencyDTO) => {
+api.handle(IpcChannels.DEPENDENCY_ACCEPT, async (event, params: NewDependencyDTO) => {
   try {
     const dependency = await dependencyService.accept(params);
     treeService.updateDependencyStatusOnTree();
@@ -27,7 +28,7 @@ ipcMain.handle(IpcChannels.DEPENDENCY_ACCEPT, async (event, params: NewDependenc
   }
 });
 
-ipcMain.handle(IpcChannels.DEPENDENCY_RESTORE, async (_event, dependencyId: number) => {
+api.handle(IpcChannels.DEPENDENCY_RESTORE, async (_event, dependencyId: number) => {
   try {
     const dependency = await dependencyService.restore(dependencyId);
     treeService.updateDependencyStatusOnTree();
@@ -38,7 +39,7 @@ ipcMain.handle(IpcChannels.DEPENDENCY_RESTORE, async (_event, dependencyId: numb
   }
 });
 
-ipcMain.handle(IpcChannels.DEPENDENCY_RESTORE_ALL, async (_event, params: RestoreAllDependenciesDTO) => {
+api.handle(IpcChannels.DEPENDENCY_RESTORE_ALL, async (_event, params: RestoreAllDependenciesDTO) => {
   try {
     let response = [];
     if (params.path) response = await dependencyService.restoreAllByPath(params.path);
@@ -51,7 +52,7 @@ ipcMain.handle(IpcChannels.DEPENDENCY_RESTORE_ALL, async (_event, params: Restor
   }
 });
 
-ipcMain.handle(IpcChannels.DEPENDENCY_ACCEPT_ALL, async (event, params: AcceptAllDependeciesDTO) => {
+api.handle(IpcChannels.DEPENDENCY_ACCEPT_ALL, async (event, params: AcceptAllDependeciesDTO) => {
   try {
     let response;
     if (params.dependencies) response = await dependencyService.acceptAllByIds(params.dependencies);
@@ -64,7 +65,7 @@ ipcMain.handle(IpcChannels.DEPENDENCY_ACCEPT_ALL, async (event, params: AcceptAl
   }
 });
 
-ipcMain.handle(IpcChannels.DEPENDENCY_REJECT, async (event, dependencyId: number) => {
+api.handle(IpcChannels.DEPENDENCY_REJECT, async (event, dependencyId: number) => {
   try {
     const response = await dependencyService.reject(dependencyId);
     treeService.updateDependencyStatusOnTree();
@@ -75,7 +76,7 @@ ipcMain.handle(IpcChannels.DEPENDENCY_REJECT, async (event, dependencyId: number
   }
 });
 
-ipcMain.handle(IpcChannels.DEPENDENCY_REJECT_ALL, async (event, param: RejectAllDependeciesDTO) => {
+api.handle(IpcChannels.DEPENDENCY_REJECT_ALL, async (event, param: RejectAllDependeciesDTO) => {
   try {
     let response;
     if (param.dependencyIds) response = await dependencyService.rejectAllByIds(param.dependencyIds);
@@ -84,6 +85,16 @@ ipcMain.handle(IpcChannels.DEPENDENCY_REJECT_ALL, async (event, param: RejectAll
     return Response.ok({ message: 'Component created successfully', data: response });
   } catch (error: any) {
     log.error('[DEPENDENCY REJECT ALL]: ', error);
+    return Response.fail({ message: error.message });
+  }
+});
+
+api.handle(IpcChannels.DEPENDENCY_MANIFEST_FILE_SUMMARY, async (event) => {
+  try {
+    const response: Array<DependencyManifestFile> = await dependencyService.getSummary();
+    return Response.ok({ message: 'Dependency summary retrieved successfully', data: response });
+  } catch (error: any) {
+    log.error('[DEPENDENCY SUMMARY]: ', error);
     return Response.fail({ message: error.message });
   }
 });

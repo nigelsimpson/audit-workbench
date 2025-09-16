@@ -1,13 +1,15 @@
 import Node, { NodeStatus } from './Node';
 import { BlackListAbstract } from './blackList/BlackListAbstract';
+import { Visitor } from './visitor/Visitor';
 
 export default class File extends Node {
   private isDependencyFile: boolean;
 
-  constructor(name: string, path: string) {
-    super(name, path);
+  constructor(path: string, name: string) {
+    super(path, name);
     this.type = 'file';
     this.isDependencyFile = false;
+    this.isBinaryFile = false;
   }
 
   public setStatus(path: string, status: NodeStatus): boolean {
@@ -53,16 +55,16 @@ export default class File extends Node {
   }
 
   public someNoMatch(): boolean {
-    return (this.original === 'NO-MATCH' && this.getAction() === 'scan');
+    return this.original === 'NO-MATCH';
   }
 
   public someMatch(): boolean {
-    return (this.original === 'MATCH' && this.getAction() === 'scan');
+    return this.original === 'MATCH';
   }
 
   public restoreStatus(path: string) {
     if (this.getPath() !== path) return;
-    if(this.isDependencyFile) return;
+    if (this.isDependencyFile) return;
     if (this.getAction() === 'filter') {
       this.status = NodeStatus.FILTERED;
       this.setStatusOnClassnameAs(this.status);
@@ -102,7 +104,7 @@ export default class File extends Node {
   }
 
   public getFiles(banned: BlackListAbstract = null): Array<any> {
-    if(banned && banned.evaluate(this)) return [];
+    if (banned && banned.evaluate(this)) return [];
     let type = '';
     if (this.status === NodeStatus.PENDING) type = NodeStatus.MATCH;
     if (this.status === NodeStatus.FILTERED) type = NodeStatus.FILTERED;
@@ -111,6 +113,8 @@ export default class File extends Node {
       {
         path: this.getPath(),
         type,
+        isBinaryFile: this.isBinaryFile,
+        isDependencyFile: this.isDependencyFile,
       },
     ];
   }
@@ -140,9 +144,12 @@ export default class File extends Node {
 
   public addDependency(path: string): void {
     if (this.getPath() === path) {
-      this.status = NodeStatus.PENDING;
-      this.setStatusOnClassnameAs(this.status);
-      this.isDependencyFile = true;
+      if (this.status !== NodeStatus.IDENTIFIED) {
+        // only adds new dependencies
+        this.status = NodeStatus.PENDING;
+        this.setStatusOnClassnameAs(this.status);
+      }
+      this.isDependencyFile = true; // always set the flag. A new tree is built on rescan
     }
   }
 
@@ -189,14 +196,13 @@ export default class File extends Node {
     return this.getName() === filename;
   }
 
-  public order():void{
+  public order(): void {}
+
+  public updateStatusFlags() {}
+
+  public updateFlags() {}
+
+  public accept<T>(visitor: Visitor<T>) {
+    return visitor.VisitFile(this);
   }
-
-  public updateStatusFlags() {
-  }
-
-  public updateFlags() {
-  }
-
-
 }

@@ -2,14 +2,8 @@
 import fs from 'fs';
 import log from 'electron-log';
 import { IDependencyResponse, Scanner } from 'scanoss';
-import {
-  FileTreeViewMode,
-  IProjectCfg,
-  IWorkbenchFilter,
-  IWorkbenchFilterParams,
-  ProjectState,
-} from '../../api/types';
-import { ScanModel } from '../model/ScanModel';
+import { FileTreeViewMode, IProjectCfg, IWorkbenchFilter, IWorkbenchFilterParams, ProjectState } from '../../api/types';
+import { ProjectModel } from '../model/project/ProjectModel';
 import { Metadata } from './Metadata';
 import { ProjectMigration } from '../migration/ProjectMigration';
 import { Tree } from './tree/Tree';
@@ -17,6 +11,8 @@ import { modelProvider } from '../services/ModelProvider';
 import { TreeViewModeCreator } from './tree/treeViewModes/TreeViewModeCreator';
 import { IpcChannels } from '../../api/ipc-channels';
 import * as ScannerCFG from '../task/scanner/types';
+import { broadcastManager } from '../broadcastManager/BroadcastManager';
+import { userSettingService } from '../services/UserSettingService';
 
 export class Project {
   work_root: string;
@@ -31,7 +27,7 @@ export class Project {
 
   results: any;
 
-  store!: ScanModel;
+  store!: ProjectModel;
 
   scanner!: Scanner;
 
@@ -75,10 +71,7 @@ export class Project {
       this.metadata.setAppVersion('0.8.0');
       this.metadata.save();
     }
-    const pMigration = new ProjectMigration(
-      this.metadata.getVersion(),
-      this.metadata.getMyPath()
-    );
+    const pMigration = new ProjectMigration(this.metadata.getVersion(), this.metadata.getMyPath());
     const newVersion: string = await pMigration.up();
     this.metadata = await Metadata.readFromPath(this.metadata.getMyPath());
     this.metadata.setAppVersion(newVersion);
@@ -87,12 +80,8 @@ export class Project {
 
   public async open(): Promise<boolean> {
     this.state = ProjectState.OPENED;
-    log.transports.file.resolvePath = () =>
-      `${this.metadata.getMyPath()}/project.log`;
-    const project = await fs.promises.readFile(
-      `${this.metadata.getMyPath()}/tree.json`,
-      'utf8'
-    );
+    log.transports.file.resolvePath = () => `${this.metadata.getMyPath()}/project.log`; //Concatenate workspace root
+    const project = await fs.promises.readFile(`${this.metadata.getMyPath()}/tree.json`, 'utf8');
     const a = JSON.parse(project);
     this.filesToScan = a.filesToScan;
     this.filesNotScanned = a.filesNotScanned;
@@ -100,17 +89,16 @@ export class Project {
     this.filesSummary = a.filesSummary;
     await modelProvider.init(this.metadata.getMyPath());
     this.metadata = await Metadata.readFromPath(this.metadata.getMyPath());
-    this.tree = new Tree(a.tree.rootFolder.label, this.metadata.getMyPath(),a.tree.rootFolder.label);
+    this.tree = new Tree(a.tree.rootFolder.label, this.metadata.getMyPath(), a.tree.rootFolder.label);
     this.tree.loadTree(a.tree.rootFolder);
     return true;
   }
 
   public async close() {
     if (this.scanner && this.scanner.isRunning()) this.scanner.stop();
-    log.info(
-      `%c[ PROJECT ]: Closing project ${this.metadata.getName()}`,
-      'color: green'
-    );
+    log.info(`%c[ PROJECT ]: Closing project ${this.metadata.getName()}`, 'color: green');
+    log.info('%c[ PROJECT ]: Closing Database', 'color: green');
+    await modelProvider.model.destroy();
     this.state = ProjectState.CLOSED;
     this.scanner = null;
     this.logical_tree = null;
@@ -131,14 +119,8 @@ export class Project {
       filesSummary: self.filesSummary,
       tree: self.tree,
     };
-    fs.writeFileSync(
-      `${this.metadata.getMyPath()}/tree.json`,
-      JSON.stringify(a)
-    );
-    log.info(
-      `%c[ PROJECT ]: Project ${this.metadata.getName()} saved`,
-      'color:green'
-    );
+    fs.writeFileSync(`${this.metadata.getMyPath()}/tree.json`, JSON.stringify(a));
+    log.info(`%c[ PROJECT ]: Project ${this.metadata.getName()} saved`, 'color:green');
   }
 
   public setState(state: ProjectState) {
@@ -178,6 +160,10 @@ export class Project {
     return this.metadata.getMyPath();
   }
 
+  public getWorkRoot() {
+    return this.metadata.getWorkRoot();
+  }
+
   public getProjectName() {
     return this.metadata.getName();
   }
@@ -210,17 +196,36 @@ export class Project {
     this.metadata.setApiKey(apiKey);
   }
 
-  public getApiKey() {
+  public setSourceCodePath(sourceCodePath: string) {
+    this.metadata.setSourceCodePath(sourceCodePath);
+  }
+
+  public getSourceCodePath() {
+    return this.metadata.getSourceCodePath();
+  }
+
+  private getProjectAPIKey() {
     return this.metadata.getApiKey();
   }
 
+  /**
+   * @brief Retrieves the appropriate API key to be used in SCANOSS services
+   * @return Returns the project-specific API key if configured, otherwise falls back to the global API key
+   * @details If no project key exists it returns the global API key set.
+   * If both keys are unset, returns undefined.
+   */
+  public getApiKey(): string {
+    const { DEFAULT_API_INDEX, APIS } = userSettingService.get();
+    return this.getProjectAPIKey() ? this.getProjectAPIKey() : APIS[DEFAULT_API_INDEX].API_KEY;
+  }
+
+  public getGlobalApi(): string {
+    const { DEFAULT_API_INDEX, APIS } = userSettingService.get();
+    return this.getApi() ? this.getApi() : APIS[DEFAULT_API_INDEX].URL;
+  }
+
   public async getResults() {
-    return JSON.parse(
-      await fs.promises.readFile(
-        `${this.metadata.getMyPath()}/result.json`,
-        'utf8'
-      )
-    );
+    return JSON.parse(await fs.promises.readFile(`${this.metadata.getMyPath()}/result.json`, 'utf8'));
   }
 
   public getTree(): Tree {
@@ -234,7 +239,7 @@ export class Project {
 
   public async notifyTree() {
     const tree = await this.tree.getTree();
-    this.tree.sendToUI(IpcChannels.TREE_UPDATED, tree);
+    broadcastManager.get().send(IpcChannels.TREE_UPDATED, tree);
   }
 
   public getNode(path: string) {
@@ -247,37 +252,27 @@ export class Project {
 
   public async getDependencies(): Promise<IDependencyResponse> {
     try {
-      return JSON.parse(
-        await fs.promises.readFile(
-          `${this.metadata.getMyPath()}/dependencies.json`,
-          'utf8'
-        )
-      );
+      return JSON.parse(await fs.promises.readFile(`${this.metadata.getMyPath()}/dependencies.json`, 'utf8'));
     } catch (e) {
       log.error(e);
-      return null;
+      throw e;
     }
   }
 
   public async setGlobalFilter(filter: IWorkbenchFilter) {
     try {
-      if (
-        !(
-          JSON.stringify({ ...filter, path: null }) ===
-          JSON.stringify({ ...this.filter, path: null })
-        )
-      ) {
-        this.tree.sendToUI(IpcChannels.TREE_UPDATING, {});
-        this.tree.setTreeViewMode(
-          TreeViewModeCreator.create(filter, this.fileTreeViewMode)
-        );
+      if (filter?.path) filter.path = filter.path + '/';
+
+      if (!(JSON.stringify({ ...filter, path: null }) === JSON.stringify({ ...this.filter, path: null }))) {
+        broadcastManager.get().send(IpcChannels.TREE_UPDATING, {});
+        this.tree.setTreeViewMode(TreeViewModeCreator.create(filter, this.fileTreeViewMode));
         this.notifyTree();
       }
       this.filter = filter;
       return true;
     } catch (e) {
       log.error(e);
-      return e;
+      throw e;
     }
   }
 

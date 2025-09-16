@@ -1,6 +1,6 @@
-import { isBinaryFileSync } from 'isbinaryfile';
 import { IDependencyResponse } from 'scanoss';
 import log from 'electron-log';
+
 import Node, { NodeStatus } from './Node';
 import File from './File';
 import Folder from './Folder';
@@ -12,6 +12,7 @@ import { TreeViewMode } from './treeViewModes/TreeViewMode';
 import { TreeViewDefault } from './treeViewModes/TreeViewDefault';
 import { defaultBannedList } from '../filtering/defaultFilter';
 
+const isBinaryPath = require('is-binary-path');
 const fs = require('fs');
 const pathLib = require('path');
 
@@ -30,7 +31,7 @@ export class Tree {
 
   private summary;
 
-  constructor(rootName: string, projectPath: string, scanRoot?:string ) {
+  constructor(rootName: string, projectPath: string, scanRoot?:string) {
     this.rootName = rootName;
     this.rootPath = scanRoot;
     this.rootFolder = new Folder('', this.rootName);
@@ -46,12 +47,11 @@ export class Tree {
   public build(files: Array<string>) {
     const addedNodes = {};
     files.forEach((f) => {
-      const splitPath = f.split("/");
-      if(splitPath.length>1) {
-        if(splitPath[0]==="") splitPath.shift();
+      const splitPath = f.split('/');
+      if (splitPath.length > 1) {
+        if (splitPath[0] === '') splitPath.shift();
         this.recursive(splitPath, this.rootFolder, addedNodes);
-      }else
-        this.recursive([f],this.rootFolder,addedNodes);
+      } else this.recursive([f], this.rootFolder, addedNodes);
     });
     return this.rootFolder;
   }
@@ -59,12 +59,11 @@ export class Tree {
   /**
    * @brief order file tree by folder and files
    * */
-  public orderTree(): void{
+  public orderTree(): void {
     this.rootFolder.order();
   }
 
- private recursive(splitPath: Array<string>, node: Folder, addedNodes : Record<string, Folder>): Node{
-
+  private recursive(splitPath: Array<string>, node: Folder, addedNodes : Record<string, Folder>): Node {
     // TODO: Change by node.getPath() ? `${node.getPath()}/${splitPath[0]}` : splitPath[0];
     const nodePath = `${node.getPath()}/${splitPath[0]}`;
     // File
@@ -75,10 +74,10 @@ export class Tree {
     }
     // Folder
     const treeNode = addedNodes[nodePath];
-    if(treeNode!== undefined){
+    if (treeNode !== undefined) {
       // eslint-disable-next-line no-param-reassign
       node = treeNode;
-    }else{
+    } else {
       const f = new Folder(nodePath, splitPath[0]);
       addedNodes[nodePath] = f;
       node.addChild(f);
@@ -86,7 +85,7 @@ export class Tree {
       node = f;
     }
     splitPath.shift();
-    this.recursive(splitPath, node,addedNodes);
+    this.recursive(splitPath, node, addedNodes);
     return node;
   }
 
@@ -96,7 +95,7 @@ export class Tree {
         if (value[i].purl !== undefined) {
           this.rootFolder.attachResults(
             { purl: value[i].purl[0], version: value[i].version },
-            key.startsWith('/') ? key : `/${key}`
+            key.startsWith('/') ? key : `/${key}`,
           );
         }
       }
@@ -154,7 +153,7 @@ export class Tree {
 
   private scanMode(filePath: string) {
     // eslint-disable-next-line prettier/prettier
-    const skipExtentions = new Set([
+    const skipExtensions = new Set([
       '.exe',
       '.zip',
       '.tar',
@@ -179,15 +178,40 @@ export class Tree {
       '.xls',
       '.xlsx',
       '.ppt',
+      '.whl',
+      '.7z',
+      '.bin',
+      '.lst',
+      '.dat',
+      '.json',
+      '.htm',
+      '.html',
+      '.xml',
+      '.md',
+      '.txt',
+      '.pptx',
+      '.odt',
+      '.ods',
+      '.odp',
+      '.pages',
+      '.key',
+      '.numbers',
+      '.pdf',
+      '.min.js',
+      '.mf',
+      '.sum',
+      '.woff',
+      '.woff2',
+      '.xsd',
+      '.pom',
     ]);
     const skipStartWith = ['{', '[', '<?xml', '<html', '<ac3d', '<!doc'];
     const MIN_FILE_SIZE = 256;
     const MAX_FILE_SIZE = 32 * 1024 * 1024;
 
-
     // Filter by extension
     const ext = pathLib.extname(filePath);
-    if (skipExtentions.has(ext)) {
+    if (skipExtensions.has(ext)) {
       return 'MD5_SCAN';
     }
     // Filter by  size
@@ -203,8 +227,8 @@ export class Tree {
         return 'MD5_SCAN';
       }
     }
-    // if binary
-    if (isBinaryFileSync(filePath)) {
+
+    if (isBinaryPath(filePath)) {
       return 'MD5_SCAN';
     }
 
@@ -213,22 +237,23 @@ export class Tree {
 
   public setFilter() {
     const bannedList = new Filtering.BannedList('NoFilter');
-    if (!fs.existsSync(`${this.projectPath}/filter.json`))
+    if (!fs.existsSync(`${this.projectPath}/filter.json`)) {
       fs.writeFileSync(
         `${this.projectPath}/filter.json`,
-        JSON.stringify(defaultBannedList).toString()
+        JSON.stringify(defaultBannedList).toString(),
       );
+    }
     bannedList.load(`${this.projectPath}/filter.json`);
 
-    log.info(`%c[ PROJECT ]: Building tree`, 'color: green');
-    log.info(`%c[ PROJECT ]: Applying filters to the tree`, 'color: green');
+    log.info('%c[ PROJECT ]: Building tree', 'color: green');
+    log.info('%c[ PROJECT ]: Applying filters to the tree', 'color: green');
     this.applyFilters(this.rootPath, this.getRootFolder(), bannedList);
   }
 
   public applyFilters(
     scanRoot: string,
     node: Node,
-    bannedList: Filtering.BannedList
+    bannedList: Filtering.BannedList,
   ) {
     let i = 0;
     if (node.getType() === 'file') {
@@ -238,6 +263,8 @@ export class Tree {
           processed: this.filesIndexed,
         });
       }
+      const absolutePath = scanRoot + node.getValue();
+      node.setIsBinaryFile(isBinaryPath(absolutePath));
       if (bannedList.evaluate(scanRoot + node.getValue())) {
         node.setAction('scan');
         node.setScanMode(this.scanMode(scanRoot + node.getValue()));
@@ -249,8 +276,7 @@ export class Tree {
     } else if (node.getType() === 'folder') {
       if (bannedList.evaluate(scanRoot + node.getValue())) {
         node.setAction('scan');
-        for (i = 0; i < node.getChildrenCount(); i += 1)
-          this.applyFilters(scanRoot, node.getChild(i), bannedList);
+        for (i = 0; i < node.getChildrenCount(); i += 1) this.applyFilters(scanRoot, node.getChild(i), bannedList);
       } else {
         node.setAction('filter');
         node.setClassNameDeep('filter-item');
@@ -279,7 +305,7 @@ export class Tree {
     return this.rootPath;
   }
 
-  public  updateFlags(){
+  public updateFlags() {
     this.rootFolder.updateFlags();
   }
 }

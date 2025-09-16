@@ -13,7 +13,7 @@ export interface ComponentState {
 }
 
 const initialState: ComponentState = {
-  components: [],
+  components: null,
   component: null,
   recents: [],
   loading: false,
@@ -24,7 +24,7 @@ export const componentSlice = createSlice({
   initialState,
   reducers: {
     setComponents: (state, action: PayloadAction<ComponentGroup[]>) => {
-      state.components = action.payload;
+     state.components = action.payload;
     },
     setComponent: (state, action: PayloadAction<ComponentGroup | null>) => {
       state.component = action.payload;
@@ -55,6 +55,7 @@ export const componentSlice = createSlice({
     },
   },
 });
+
 // actions
 export const { setComponents, setComponent, setRecentComponent, reset } = componentSlice.actions;
 

@@ -1,6 +1,6 @@
 import { IpcRendererEvent } from 'electron';
 import { IpcChannels } from '@api/ipc-channels';
-import {IAppInfo} from "@api/dto";
+import { IAppInfo } from '@api/dto';
 
 declare global {
   interface Window {
@@ -20,6 +20,7 @@ declare global {
       homedir(): string;
     };
     shell: {
+      openPath(path: string): void;
       showItemInFolder(path: string): void;
       openExternal(url: string, options?: Electron.OpenExternalOptions): Promise<void>;
     };

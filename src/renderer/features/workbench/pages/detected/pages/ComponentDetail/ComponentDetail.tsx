@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ChevronRightOutlinedIcon from '@mui/icons-material/ChevronRightOutlined';
 import { Inventory } from '@api/types';
@@ -7,7 +7,9 @@ import { DialogContext, IDialogContext } from '@context/DialogProvider';
 import { DIALOG_ACTIONS } from '@context/types';
 import { mapFiles } from '@shared/utils/scan-util';
 import { useDispatch, useSelector } from 'react-redux';
-import { createInventory, detachFile, ignoreFile, restoreFile } from '@store/inventory-store/inventoryThunks';
+import {
+  createInventory, detachFile, ignoreFile, restoreFile,
+} from '@store/inventory-store/inventoryThunks';
 import { selectNavigationState, setVersion } from '@store/navigation-store/navigationSlice';
 import { selectComponentState } from '@store/component-store/componentSlice';
 import { selectWorkbench, setHistory } from '@store/workbench-store/workbenchSlice';
@@ -35,11 +37,13 @@ export const ComponentDetail = () => {
 
   const dialogCtrl = useContext(DialogContext) as IDialogContext;
 
+  const isLoaded = useRef<boolean>(false);
+
   const { summary, history: stateHistory } = useSelector(selectWorkbench);
   const { component } = useSelector(selectComponentState);
   const { filter, node, version } = useSelector(selectNavigationState);
 
-  const [files, setFiles] = useState<any[]>([]);
+  const [files, setFiles] = useState<any[] | null>(null);
   const [filterFiles, setFilterFiles] = useState<{ pending: any[]; identified: any[]; ignored: any[] }>({
     pending: null,
     identified: null,
@@ -57,10 +61,7 @@ export const ComponentDetail = () => {
   const onAction = async (file: any, action: MATCH_CARD_ACTIONS) => {
     switch (action) {
       case MATCH_CARD_ACTIONS.ACTION_ENTER:
-        navigate({
-          pathname: '/workbench/detected/file',
-          search: `?path=file|${encodeURIComponent(file.path)}`,
-        });
+        onEnterPressed(file);
         break;
       case MATCH_CARD_ACTIONS.ACTION_IDENTIFY:
         await onIdentifyPressed(file);
@@ -81,7 +82,16 @@ export const ComponentDetail = () => {
         break;
     }
 
-    getFiles();
+    if (action !== MATCH_CARD_ACTIONS.ACTION_ENTER && action !== MATCH_CARD_ACTIONS.ACTION_DETAIL) {
+      getFiles();
+    }
+  };
+
+  const onEnterPressed = (file) => {
+    navigate({
+      pathname: '/workbench/detected/file',
+      search: `?path=file|${encodeURIComponent(file.path)}`,
+    });
   };
 
   const onIdentifyPressed = async (result) => {
@@ -101,8 +111,6 @@ export const ComponentDetail = () => {
   const onIdentifyAllPressed = async () => {
     const selFiles = filterFiles.pending.map((file) => file.id);
     const inv: Partial<Inventory> = {
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
       component: component.name,
       version: version || component.versions[0]?.version,
       spdxid: component.versions[0]?.reliableLicense || component.versions[0]?.licenses[0]?.spdxid,
@@ -120,7 +128,7 @@ export const ComponentDetail = () => {
 
   const onIgnoreAllPressed = async () => {
     const { action } = await dialogCtrl.openConfirmDialog(
-      t('Dialog:MarkOriginalFiles', { count: filterFiles.pending.length})
+      t('Dialog:MarkOriginalFiles', { count: filterFiles.pending.length }),
     );
 
     if (action === DIALOG_ACTIONS.OK) {
@@ -131,7 +139,7 @@ export const ComponentDetail = () => {
 
   const onRestoreAllPressed = async () => {
     const { action } = await dialogCtrl.openConfirmDialog(
-      t('Dialog:RestoreFiles', { count: filterFiles.ignored.length})
+      t('Dialog:RestoreFiles', { count: filterFiles.ignored.length }),
     );
 
     if (action === DIALOG_ACTIONS.OK) {
@@ -142,7 +150,7 @@ export const ComponentDetail = () => {
 
   const onDetachAllPressed = async () => {
     const { action } = await dialogCtrl.openConfirmDialog(
-      t('Dialog:RestoreFiles', { count: filterFiles.identified.length})
+      t('Dialog:RestoreFiles', { count: filterFiles.identified.length }),
     );
 
     if (action === DIALOG_ACTIONS.OK) {
@@ -172,7 +180,7 @@ export const ComponentDetail = () => {
       createInventory({
         ...inventory,
         files: selFiles,
-      })
+      }),
     );
   };
 
@@ -197,12 +205,14 @@ export const ComponentDetail = () => {
       identified: null,
       ignored: null,
     });
-    getFiles();
   }, [version, node]);
 
   useEffect(() => {
-    if(searchQuery === null || searchQuery === undefined || !files) return;
+    if (isLoaded.current) getFiles();
+  }, [summary, version, node]);
 
+  useEffect(() => {
+    if (searchQuery === null || searchQuery === undefined || !files) return;
     setFilterFiles({
       pending: files.filter((file) => file.path.toLowerCase().includes(searchQuery) && file.status === 'pending'),
       identified: files.filter((file) => file.path.toLowerCase().includes(searchQuery) && file.status === 'identified'),
@@ -211,12 +221,21 @@ export const ComponentDetail = () => {
   }, [searchQuery, files]);
 
   useEffect(() => {
-    getFiles();
-  }, [summary]);
-
-  useEffect(() => {
     dispatch(setHistory({ section: tab }));
   }, [tab]);
+
+  useEffect(() => {
+    const init = async () => {
+      await getFiles();
+      isLoaded.current = true;
+    };
+
+    init();
+
+    return () => {
+      dispatch(setVersion(null));
+    };
+  }, []);
 
   const renderTab = () => {
     switch (tab) {
@@ -224,7 +243,7 @@ export const ComponentDetail = () => {
         return (
           <FileList
             files={filterFiles.pending}
-            emptyMessage={searchQuery ? t('NoPendingFilesWith', { searchQuery }) :  t('NoPendingFiles')}
+            emptyMessage={searchQuery ? t('NoPendingFilesWith', { searchQuery }) : t('NoPendingFiles')}
             onAction={onAction}
           />
         );
@@ -232,7 +251,7 @@ export const ComponentDetail = () => {
         return (
           <IdentifiedList
             files={filterFiles.identified}
-            emptyMessage={searchQuery ? t('NoIdentifiedFilesWith', { searchQuery }) :  t('NoIdentifiedFiles')}
+            emptyMessage={searchQuery ? t('NoIdentifiedFilesWith', { searchQuery }) : t('NoIdentifiedFiles')}
             onAction={onAction}
           />
         );
@@ -240,7 +259,7 @@ export const ComponentDetail = () => {
         return (
           <FileList
             files={filterFiles.ignored}
-            emptyMessage={searchQuery ? t('NoOriginalFilesWith', { searchQuery }) :  t('NoOriginalFiles')}
+            emptyMessage={searchQuery ? t('NoOriginalFilesWith', { searchQuery }) : t('NoOriginalFiles')}
             onAction={onAction}
           />
         );
@@ -250,53 +269,51 @@ export const ComponentDetail = () => {
   };
 
   return (
-    <>
-      <section id="ComponentDetail" className="app-page">
-        <header className="app-header">
-          <div className="header">
-            <Breadcrumb />
-            <div className="filter-container">
-              <ComponentInfo component={component} />
-              <ChevronRightOutlinedIcon fontSize="small" />
-              <VersionSelector
-                versions={component?.versions}
-                version={version}
-                onSelect={(version) => dispatch(setVersion(version))}
-                component={component}
-              />
-            </div>
+    <section id="ComponentDetail" className="app-page">
+      <header className="app-header">
+        <div className="header">
+          <Breadcrumb />
+          <div className="filter-container">
+            <ComponentInfo component={component} />
+            <ChevronRightOutlinedIcon fontSize="small" />
+            <VersionSelector
+              versions={component?.versions}
+              version={version}
+              onSelect={(version) => dispatch(setVersion(version))}
+              component={component}
+            />
+          </div>
+        </div>
+
+        <section className="subheader">
+          <div className="search-box">
+            <SearchBox onChange={(value) => setSearchQuery(value.trim().toLowerCase())} />
           </div>
 
-          <section className="subheader">
-            <div className="search-box">
-              <SearchBox onChange={(value) => setSearchQuery(value.trim().toLowerCase())} />
-            </div>
+          <div className="tab-navigation">
+            <TabNavigation
+              tab={tab}
+              version={version}
+              query={searchQuery}
+              component={component}
+              filterFiles={filterFiles}
+              onSelect={(tab) => setTab(tab)}
+            />
 
-            <div className="tab-navigation">
-              <TabNavigation
-                tab={tab}
-                version={version}
-                query={searchQuery}
-                component={component}
-                filterFiles={filterFiles}
-                onSelect={(tab) => setTab(tab)}
-              />
+            <ActionButton
+              tab={tab}
+              files={filterFiles}
+              onIdentifyAllPressed={onIdentifyAllPressed}
+              onIgnoreAllPressed={onIgnoreAllPressed}
+              onRestoreAllPressed={onRestoreAllPressed}
+              onDetachAllPressed={onDetachAllPressed}
+            />
+          </div>
+        </section>
+      </header>
 
-              <ActionButton
-                tab={tab}
-                files={filterFiles}
-                onIdentifyAllPressed={onIdentifyAllPressed}
-                onIgnoreAllPressed={onIgnoreAllPressed}
-                onRestoreAllPressed={onRestoreAllPressed}
-                onDetachAllPressed={onDetachAllPressed}
-              />
-            </div>
-          </section>
-        </header>
-
-        <main className="app-content">{filterFiles && renderTab()}</main>
-      </section>
-    </>
+      <main className="app-content">{filterFiles && renderTab()}</main>
+    </section>
   );
 };
 

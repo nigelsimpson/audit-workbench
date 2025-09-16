@@ -1,10 +1,18 @@
 import { projectService } from '@api/services/project.service';
 import { componentService } from '@api/services/component.service';
-import { ComponentGroup, ComponentSource, IWorkbenchFilterParams } from '@api/types';
+import {
+  ComponentGroup,
+  ComponentSource,
+  IProject,
+  IWorkbenchFilterParams,
+  ProjectAccessMode,
+  ProjectOpenResponse,
+  ProjectSource
+} from '@api/types';
 import { sortComponents } from '@shared/utils/scan-util';
 import { IpcChannels } from '@api/ipc-channels';
-import AppConfig from '../../config/AppConfigModule';
 import { Scanner } from '../../main/task/scanner/types';
+import { fileService } from '@api/services/file.service';
 
 
 export interface ScanResult {
@@ -15,6 +23,15 @@ export interface ScanResult {
   fileTree: any;
   dependencies: Array<string>;
   config: Scanner.ScannerConfig;
+  mode: ProjectAccessMode
+  lockedBy: string;
+  projectSource: ProjectSource;
+  sourceCodePath: string;
+}
+
+export interface ProjectSettings {
+  api_url: string;
+  api_key: string;
 }
 
 class WorkbenchController {
@@ -25,9 +42,20 @@ class WorkbenchController {
    * @returns {Promise<ScanResult>}
    * @memberof WorkbenchController
    */
-  public async loadScan(path: string): Promise<ScanResult> {
-    const { data } = await projectService.load(path);
+  public async loadScan(path: string, mode?: ProjectAccessMode): Promise<ScanResult> {
+    const data = await projectService.load(path, mode);
     return this.generateScanResult(data);
+  }
+
+  public async closeCurrentScan(): Promise<IProject> {
+    return projectService.close();
+  }
+
+  public async loadSettings(): Promise<ProjectSettings> {
+    const api_url = await projectService.getApiURL();
+    const api_key = await projectService.getApiKey();
+
+    return { api_key, api_url };
   }
 
   /**
@@ -46,15 +74,12 @@ class WorkbenchController {
    * Get file content from a remote file
    *
    * @param {string} hash
-   * @returns {string}
+   * @param {ProjectSettings} config
    * @memberof WorkbenchController
    */
-  public async fetchRemoteFile(hash: string): Promise<string> {
-    // TODO: move api url to API Config
-    const response = await fetch(`${AppConfig.API_URL}/file_contents/${hash}`);
-    if (!response.ok) throw new Error('File not found');
-
-    return response.text();
+  public async fetchRemoteFile(hash: string, config: ProjectSettings = null): Promise<string> {
+    const fileContent = await fileService.getRemoteFileContent(hash);
+    return fileContent;
   }
 
   public async getComponents(params: IWorkbenchFilterParams = null): Promise<ComponentGroup[]> {
@@ -69,7 +94,7 @@ class WorkbenchController {
   public async getComponent(purl: string, params: IWorkbenchFilterParams = null): Promise<ComponentGroup> {
     const comp = await componentService.get(
       { purl },
-      { ...params, filter: { ...params?.filter } }
+      { ...params, filter: { ...params?.filter } },
     );
     return comp;
   }
@@ -79,7 +104,7 @@ class WorkbenchController {
     return tree;
   }
 
-  private async generateScanResult(data): Promise<ScanResult> {
+  private async generateScanResult(data: ProjectOpenResponse): Promise<ScanResult> {
     const tree = data.logical_tree;
     const work = data.work_root;
     const { dependencies } = data;
@@ -89,10 +114,14 @@ class WorkbenchController {
       name: data.metadata.name,
       imported,
       scanRoot: data.scan_root,
+      sourceCodePath: data.sourceCodePath,
       projectRoot: work,
       fileTree: tree,
       dependencies,
       config: data.metadata.scannerConfig,
+      mode: data.mode,
+      lockedBy: data.lockedBy,
+      projectSource: data.metadata.source as ProjectSource || ProjectSource.SCAN
     };
   }
 }

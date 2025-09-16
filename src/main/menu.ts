@@ -1,10 +1,11 @@
-import { app, Menu, shell, BrowserWindow, MenuItemConstructorOptions } from 'electron';
+import {
+  app, Menu, shell, BrowserWindow, MenuItemConstructorOptions,
+} from 'electron';
 import path from 'path';
 import i18next from 'i18next';
 import { IpcChannels } from '../api/ipc-channels';
 import AppConfig from '../config/AppConfigModule';
-import {resolveHtmlPath} from "./util";
-
+import { resolveHtmlPath } from './util';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
   selector?: string;
@@ -15,9 +16,7 @@ const RESOURCES_PATH = app.isPackaged
   ? path.join(process.resourcesPath, 'assets')
   : path.join(__dirname, '../../assets');
 
-const getAssetPath = (...paths: string[]): string => {
-  return path.join(RESOURCES_PATH, ...paths);
-};
+const getAssetPath = (...paths: string[]): string => path.join(RESOURCES_PATH, ...paths);
 
 export default class MenuBuilder {
   mainWindow: BrowserWindow;
@@ -61,7 +60,7 @@ export default class MenuBuilder {
 
   buildDarwinTemplate(): MenuItemConstructorOptions[] {
     const subMenuAbout: DarwinMenuItemConstructorOptions = {
-      label: 'Scanoss',
+      label: AppConfig.APP_NAME,
       submenu: [
         {
           label: i18next.t('AppMenu:NewProject'),
@@ -77,10 +76,22 @@ export default class MenuBuilder {
           },
         },
         {
+          label: i18next.t('AppMenu:ImportProjectWithSource'),
+          click: () => {
+            this.mainWindow.webContents.send(IpcChannels.MENU_IMPORT_PROJECT_WITH_SOURCE);
+          },
+        },
+        {
           label: i18next.t('AppMenu:Settings'),
           accelerator: 'Command+,',
           click: () => {
             this.mainWindow.webContents.send(IpcChannels.MENU_OPEN_SETTINGS);
+          },
+        },
+        {
+          label: i18next.t('AppMenu:ManageSearchIndexGroups'),
+          click: () => {
+            this.mainWindow.webContents.send(IpcChannels.MENU_OPEN_SEARCH_INDEX_GROUPS);
           },
         },
         {
@@ -155,7 +166,7 @@ export default class MenuBuilder {
       ],
     };
     const subMenuHelp: MenuItemConstructorOptions = {
-      label:  i18next.t('AppMenu:Help'),
+      label: i18next.t('AppMenu:Help'),
       submenu: [
         {
           label: i18next.t('AppMenu:About'),
@@ -166,8 +177,7 @@ export default class MenuBuilder {
       ],
     };
 
-    const subMenuView =
-      process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true' ? subMenuViewDev : subMenuViewProd;
+    const subMenuView = process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true' ? subMenuViewDev : subMenuViewProd;
 
     return [subMenuAbout, subMenuEdit, subMenuView, subMenuWindow, subMenuHelp];
   }
@@ -191,10 +201,22 @@ export default class MenuBuilder {
             },
           },
           {
+            label: i18next.t('AppMenu:ImportProjectWithSource'),
+            click: () => {
+              this.mainWindow.webContents.send(IpcChannels.MENU_IMPORT_PROJECT_WITH_SOURCE);
+            },
+          },
+          {
             label: i18next.t('AppMenu:Settings'),
             accelerator: 'Ctrl+Alt+S',
             click: () => {
               this.mainWindow.webContents.send(IpcChannels.MENU_OPEN_SETTINGS);
+            },
+          },
+          {
+            label: i18next.t('AppMenu:ManageSearchIndexGroups'),
+            click: () => {
+              this.mainWindow.webContents.send(IpcChannels.MENU_OPEN_SEARCH_INDEX_GROUPS);
             },
           },
           {
@@ -207,7 +229,7 @@ export default class MenuBuilder {
         ],
       },
       {
-        label:  i18next.t('AppMenu:Edit'),
+        label: i18next.t('AppMenu:Edit'),
         submenu: [
           /* {role: 'undo'},
           {role: 'redo'},
@@ -225,46 +247,46 @@ export default class MenuBuilder {
         submenu:
           process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true'
             ? [
-                {
-                  label: i18next.t('AppMenu:Reload'),
-                  accelerator: 'Ctrl+R',
-                  click: () => {
-                    this.mainWindow.webContents.reload();
-                  },
+              {
+                label: i18next.t('AppMenu:Reload'),
+                accelerator: 'Ctrl+R',
+                click: () => {
+                  this.mainWindow.webContents.reload();
                 },
-                {
-                  label: i18next.t('AppMenu:OpenTranslationManagement'),
-                  click: () => {
-                    this.mainWindow.webContents.send(IpcChannels.MENU_OPEN_TRANSLATION_MANAGER);
-                  },
+              },
+              {
+                label: i18next.t('AppMenu:OpenTranslationManagement'),
+                click: () => {
+                  this.mainWindow.webContents.send(IpcChannels.MENU_OPEN_TRANSLATION_MANAGER);
                 },
-                {
-                  label:  i18next.t('AppMenu:ToggleFullScreen'),
-                  accelerator: 'F11',
-                  click: () => {
-                    this.mainWindow.setFullScreen(!this.mainWindow.isFullScreen());
-                  },
+              },
+              {
+                label: i18next.t('AppMenu:ToggleFullScreen'),
+                accelerator: 'F11',
+                click: () => {
+                  this.mainWindow.setFullScreen(!this.mainWindow.isFullScreen());
                 },
-                {
-                  label: i18next.t('AppMenu:ToggleDeveloperTools'),
-                  accelerator: 'Alt+Ctrl+I',
-                  click: () => {
-                    this.mainWindow.webContents.toggleDevTools();
-                  },
+              },
+              {
+                label: i18next.t('AppMenu:ToggleDeveloperTools'),
+                accelerator: 'Alt+Ctrl+I',
+                click: () => {
+                  this.mainWindow.webContents.toggleDevTools();
                 },
-              ]
+              },
+            ]
             : [
-                {
-                  label:  i18next.t('AppMenu:ToggleFullScreen'),
-                  accelerator: 'F11',
-                  click: () => {
-                    this.mainWindow.setFullScreen(!this.mainWindow.isFullScreen());
-                  },
+              {
+                label: i18next.t('AppMenu:ToggleFullScreen'),
+                accelerator: 'F11',
+                click: () => {
+                  this.mainWindow.setFullScreen(!this.mainWindow.isFullScreen());
                 },
-              ],
+              },
+            ],
       },
       {
-        label:  i18next.t('AppMenu:Help'),
+        label: i18next.t('AppMenu:Help'),
         submenu: [
           {
             label: i18next.t('AppMenu:About'),
@@ -291,20 +313,21 @@ export default class MenuBuilder {
       backgroundColor: '#e4e4e7',
       webPreferences: {
         devTools: false,
+        sandbox: false,
         preload: app.isPackaged ? path.join(__dirname, 'preload.js') : path.join(__dirname, '../../.erb/dll/preload.js'),
       },
     });
 
     aboutWindow.webContents.on('before-input-event', (event, input) => {
       if (input.key.toLowerCase() === 'escape') {
-        event.preventDefault()
+        event.preventDefault();
         aboutWindow.close();
       }
     });
 
-    aboutWindow.webContents.on('new-window', (event, url) => {
-      event.preventDefault();
-      shell.openExternal(url);
+    aboutWindow.webContents.setWindowOpenHandler((details) => {
+      shell.openExternal(details.url);
+      return { action: 'deny' };
     });
 
     aboutWindow.loadURL(`${this.mainURL}#/about`);

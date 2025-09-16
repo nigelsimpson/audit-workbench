@@ -33,13 +33,16 @@ export class IndexTask implements Scanner.IPipelineTask {
       .getTree()
       .getRootFolder()
       .getFiles(new BlackListKeyWordIndex());
-    const paths = f.map((fi) => fi.path);
+
+    const paths = f.map((fi) => `'${fi.path}'`).join(', ');
+
     const files = await modelProvider.model.file.getAll(
-      QueryBuilderCreator.create(paths)
+      QueryBuilderCreator.create({ paths }),
     );
+
     const indexer = new Indexer();
     const filesToIndex = this.fileAdapter(files);
-    const index = indexer.index(filesToIndex);
+    const index = await indexer.index(filesToIndex);
     const projectPath = this.project.metadata.getMyPath();
     await indexer.saveIndex(index, `${projectPath}/dictionary/`);
     this.project.save();

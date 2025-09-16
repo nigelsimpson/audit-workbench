@@ -1,6 +1,7 @@
 {
   "NewProject": "新项目",
   "ImportProject": "导入项目",
+  "ImportProjectWithSource": "Import project with source",
   "Continue": "继续",
   "Save": "保存",
   "Cancel": "取消",
@@ -10,7 +11,7 @@
   "OK": "OK",
   "Identify": "识别",
   "IdentifyAllWithCount": "识别全部 ({{count}})",
-  "MarkAllAsOriginalWithCount": "标记所有未原始 ({{count}})",
+  "MarkAllAsOriginalWithCount": "标记所有为自研 ({{count}})",
   "RestoreAllWithCount": "恢复所有 ({{count}})",
   "AcceptAllWithCount": "接受所有 ({{count}})",
   "DismissAllPendingWithCount": "取消所有待定 ({{count}})",
@@ -36,5 +37,12 @@
   "Delete": "删除",
   "Keep": "保留",
   "Overwrite": "覆盖",
-  "Yes": "是"
+  "Yes": "是",
+  "RestartLater": "Restart later",
+  "RestartNow": "Restart now",
+  "NewFromWFPFile": "New from WFP",
+  "AddNewWorkspace": "Add new workspace",
+  "ImportFromResultFile": "Import from raw result file",
+  "ImportFromWFPFile": "Import from WFP",
+  "Browse": "Browse"
 }

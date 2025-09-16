@@ -1,4 +1,5 @@
 import {
+  Alert,
   Button,
   Divider,
   IconButton,
@@ -22,7 +23,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CheckCircleOutlineOutlinedIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
 import { useSelector } from 'react-redux';
-import { selectWorkbench } from '@store/workbench-store/workbenchSlice';
+import { selectIsReadOnly, selectWorkbench } from '@store/workbench-store/workbenchSlice';
 import { useTranslation } from 'react-i18next';
 
 const Navigation = () => {
@@ -103,7 +104,7 @@ const AppProgress = ({ summary, progress }) => {
     <section id="AppProgress">
       <Tooltip
         arrow
-        title={
+        title={(
           <div id="ProgressTooltip">
             <header>
               <Typography className="title d-flex space-between">
@@ -152,7 +153,7 @@ const AppProgress = ({ summary, progress }) => {
               </div>
             </section>
           </div>
-        }
+        )}
       >
         <div className="progress-container ">
           <p>{Math.trunc(progress)}%</p>
@@ -188,19 +189,15 @@ const AppTitle = ({ title }) => {
   return (
     <section id="AppTitle">
       {title && (
-        <>
-          <span>
+        <span>
             {title.length > max ? (
-              <>
-                <Tooltip title={title}>
-                  <span>{title.substring(0, max - 3)}...</span>
-                </Tooltip>
-              </>
+              <Tooltip title={title}>
+                <span>{title.substring(0, max - 3)}...</span>
+              </Tooltip>
             ) : (
               title
             )}
-          </span>
-        </>
+        </span>
       )}
       <ChevronRightOutlinedIcon fontSize="small" />
       <Typography variant="h6" className="title-main">
@@ -214,33 +211,42 @@ const AppBar = ({ exp }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const state = useSelector(selectWorkbench);
+  const isReadOnly = useSelector(selectIsReadOnly);
 
-  const onBackPressed = () =>  navigate('/workspace');
+  const onBackPressed = () => navigate('/workspace');
 
   return (
-    <>
-      <MaterialAppBar id="AppBar" elevation={1}>
-        <Toolbar>
-          <div className="slot start">
-            <Tooltip title={t('Tooltip:BackToProjects')}>
-              <IconButton onClick={onBackPressed} edge="start" color="inherit" aria-label="menu" size="large">
-                <HomeOutlinedIcon />
-              </IconButton>
-            </Tooltip>
-            <Divider orientation="vertical" flexItem />
-            <Navigation />
-            <Divider orientation="vertical" flexItem />
-            <AppMenu />
-          </div>
+    <MaterialAppBar id="AppBar" elevation={1}>
+      <Toolbar>
+        <div className="slot start">
+          <Tooltip title={t('Tooltip:BackToProjects')}>
+            <IconButton onClick={onBackPressed} edge="start" color="inherit" aria-label="menu" size="large">
+              <HomeOutlinedIcon />
+            </IconButton>
+          </Tooltip>
+          <Divider orientation="vertical" flexItem />
+          <Navigation />
+          <Divider orientation="vertical" flexItem />
+          <AppMenu />
+        </div>
 
-          <AppTitle title={state.name} />
+        <AppTitle title={state.name} />
 
-          <div className="slot end">
-            <AppProgress summary={state.summary} progress={state.progress} />
-          </div>
-        </Toolbar>
-      </MaterialAppBar>
-    </>
+        <div className="slot end">
+          <AppProgress summary={state.summary} progress={state.progress} />
+        </div>
+      </Toolbar>
+
+      { isReadOnly && (
+      <Alert severity="warning">
+        { state.lockedBy ? (
+          <>You are in <b>read-only</b> mode as another user has this project locked for edit (Locked by: {state.lockedBy})</>
+        ) : (
+          <>You are in <b>read-only</b> mode. Other users can edit this project</>
+        ) }
+      </Alert>
+      ) }
+    </MaterialAppBar>
   );
 };
 

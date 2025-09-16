@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import { Format } from '../Format';
+import { ExportStatusCode } from '../../../../api/types';
 
 export class Raw extends Format {
   constructor() {
@@ -16,6 +17,14 @@ export class Raw extends Format {
       if (key.charAt(0) === '/') vKey = key.substring(1);
       out[vKey] = obj;
     }
-    return JSON.stringify(out, undefined, 2);
+    return {
+      report: JSON.stringify(out, undefined, 2),
+      status: {
+        code: ExportStatusCode.SUCCESS,
+        info: {
+          invalidPurls: [],
+        },
+      },
+    };
   }
 }

@@ -16,7 +16,7 @@ export class WFPIndexTreeTask extends IndexTreeTask {
 
   private getFiles(): Array<string> {
     const wfp = this.getWFPContent();
-    const regex = new RegExp(/^file=\w+,\w+,(?<path>.+$)/gm);
+    const regex = new RegExp(/file=.*,.*,(?<path>.*)/g);
     const files = [];
     let result = regex.exec(wfp);
     while (result !== null) {
@@ -26,11 +26,15 @@ export class WFPIndexTreeTask extends IndexTreeTask {
     return files;
   }
 
-
   private getWFPContent():string {
-   const wfp = fs.readFileSync(this.project.getScanRoot(),
-      {encoding:'utf8'});
-    return wfp;
+    try {
+      const wfp = fs.readFileSync(this.project.getScanRoot(),
+        { encoding: 'utf8' });
+      return wfp;
+    }
+    catch(e){
+      throw new Error(`WFP file does not exists in: ${this.project.getScanRoot()}`);
+    }
   }
 
   /**

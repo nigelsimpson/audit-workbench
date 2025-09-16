@@ -8,6 +8,7 @@ import path from 'path';
 import MonacoWebpackPlugin from 'monaco-editor-webpack-plugin';
 import { dependencies as externals } from '../../release/app/package.json';
 
+
 const configuration: webpack.Configuration = {
   externals: [...Object.keys(externals || {})],
 

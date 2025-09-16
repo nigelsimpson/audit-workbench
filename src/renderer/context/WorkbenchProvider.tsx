@@ -26,15 +26,16 @@ export const WorkbenchProvider: React.FC<any> = ({ children }) => {
   const [dialog, setDialog] = React.useState(null);
 
   const onTreeUpdating = (_event) => {
-    console.log("onTreeUpdating");
+    console.log('onTreeUpdating');
     dispatch(setLoading(true));
   };
 
   const onTreeRefreshed = (_event, fileTree) => {
-    console.log("onTreeRefreshed");
+    console.log('onTreeRefreshed');
     dispatch(setTree(fileTree));
   };
   const setNode = async (node: Node) => dispatch(setCurrentNode(node));
+  
 
   /**
    * Dispatch load action when a filter is set
@@ -83,7 +84,7 @@ export const WorkbenchProvider: React.FC<any> = ({ children }) => {
       }
 
       if (batchRunning) {
-        await dialog?.present({message: 'Please wait...' });
+        await dialog?.present({ message: 'Please wait...' });
       } else {
         await dialog?.dismiss();
       }

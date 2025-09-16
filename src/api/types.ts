@@ -1,6 +1,12 @@
+import { IReportData, ISummary, ReportComponent } from 'main/services/ReportService';
 import { NodeStatus } from '../main/workspace/tree/Node';
 import { Scanner } from '../main/task/scanner/types';
 import ScannerConfig = Scanner.ScannerConfig;
+import Folder from '../main/workspace/tree/Folder';
+import { Metadata } from '../main/workspace/Metadata';
+import { CryptographicItem } from '../main/model/entity/Cryptography';
+
+
 
 export enum ScanState {
   CREATED = 'CREATED',
@@ -24,14 +30,29 @@ export interface IProjectCfg {
 export interface IWorkspaceCfg {
   DEFAULT_API_INDEX: number;
   APIS: Array<Record<string, string>>;
+  DEFAULT_WORKSPACE_INDEX: number;
+  WORKSPACES: Array<WorkspaceData>;
   TOKEN: string;
   SCAN_MODE: string;
   VERSION: string;
   LNG: string;
-  PROXY: string;
+  HTTP_PROXY: string;   // [http://|https://][<username>[:<password>]@]<IP|domain_name>[:<port>]
+  HTTPS_PROXY: string;
+  GRPC_PROXY: string;
+  PAC_PROXY: string;    //URL
+  NO_PROXY: string[];
   CA_CERT: string;
   IGNORE_CERT_ERRORS: boolean;
-  PAC: string;  //TODO: add this option to the migration
+  SCANNER_TIMEOUT: number;
+  SCANNER_POST_SIZE: number;
+  SCANNER_CONCURRENCY_LIMIT: number;
+  MULTIUSER_LOCK_TIMEOUT: number;
+}
+
+export interface WorkspaceData {
+  NAME: string;
+  PATH: string;
+  DESCRIPTION: string;
 }
 
 export interface Node {
@@ -46,12 +67,19 @@ export interface Inventory {
   purl: string;
   version: string;
   usage: string;
+  source: string;
   notes: string;
   url: string;
   license_name: string;
   spdxid: string;
   files: any[];
 }
+
+export type AuditSummaryCount = {
+  pending: number;
+  ignored: number;
+  identified: number;
+};
 
 export interface Component {
   compid?: number;
@@ -61,13 +89,15 @@ export interface Component {
   vendor: string;
   url: string;
   description: string;
-  summary?: {
-    pending: number;
-    ignored: number;
-    identified: number;
-  };
+  summary?: AuditSummaryCount;
   licenses: any[];
   source: string;
+}
+
+export interface DependencyManifestFile {
+  path: string;
+  fileId: number;
+  summary: AuditSummaryCount;
 }
 
 export interface License {
@@ -76,6 +106,7 @@ export interface License {
   spdxid: string;
   url: string;
   fulltext: string;
+  official?: number;
 }
 
 export interface NewComponentDTO {
@@ -99,6 +130,7 @@ export interface ItemInclude {
 export interface INewProject {
   name: string;
   scan_root: string;
+  sourceCodePath: string;
   default_license: string;
   default_components?: string;
   api?: string;
@@ -153,18 +185,26 @@ export enum HashType {
 }
 
 export enum ExportFormat {
-  SPDX20 = 'SPDX20',
-  SPDXLITE = 'SPDXLITE',
   CSV = 'CSV',
   RAW = 'RAW',
   WFP = 'WFP',
-  SPDXLITEJSON = 'SPDXLITEJSON',
+  BOM = 'BOM',
   HTMLSUMMARY = 'HTMLSUMMARY',
+  SETTINGS = 'SETTINGS',
 }
 
 export enum ExportSource {
   DETECTED = 'DETECTED',
   IDENTIFIED = 'IDENTIFIED',
+}
+
+export enum InventoryType {
+  SBOM = 'SBOM',
+  CRYPTOGRAPHY = 'CRYPTOGRAPHY',
+  VULNERABILITY = 'VULNERABILITY',
+  CYLONEDX = 'CYCLONEDX',
+  CYCLONEDX_WITH_VULNERABILITIES = 'CYLONEDX-WITH-VULNERABILITIES',
+  SPDXLITE = 'SPDXLITE',
 }
 
 export type IParams = Record<PropertyKey, any> & {
@@ -225,6 +265,7 @@ export enum FileStatusType {
 export enum FileUsageType {
   SNIPPET = 'snippet',
   FILE = 'file',
+  DEPENDENCY = 'dependency',
 }
 
 export enum ComponentSource {
@@ -253,7 +294,7 @@ export interface Result {
   component: string;
   version: string;
   latest_version: string;
-  cpe: string,
+  cpe: string;
   lines: string;
   url: string;
   oss_lines: string;
@@ -261,7 +302,7 @@ export interface Result {
   filename: string;
   size: string;
   idtype: string;
-  md5_comp: string;
+  url_hash: string;
   compid: number;
   purl: string;
   file_url: string;
@@ -269,6 +310,7 @@ export interface Result {
 }
 
 export interface Dependency {
+  path: string;
   dependencyId: number;
   fileId: number;
   licenses: string[];
@@ -277,14 +319,12 @@ export interface Dependency {
   scope: string;
   componentName: string;
   component: Component;
-  status:
-    | FileStatusType.IDENTIFIED
-    | FileStatusType.ORIGINAL
-    | FileStatusType.PENDING;
+  status: FileStatusType.IDENTIFIED | FileStatusType.ORIGINAL | FileStatusType.PENDING;
   inventory: Inventory;
   valid: boolean;
   originalVersion: string;
   originalLicense: string[];
+  rejectedAt?: string
 }
 
 export enum ScannerStage {
@@ -295,7 +335,11 @@ export enum ScannerStage {
   RESUME,
   DEPENDENCY,
   VULNERABILITY,
+  CRYPTOGRAPHY,
+  LOCAL_CRYPTOGRAPHY,
+  EXPORT_CONTROL,
   SEARCH_INDEX,
+  IMPORT_COMPONENT,
 }
 
 export interface InventoryExtraction {
@@ -314,7 +358,7 @@ export interface InventoryKnowledgeExtraction {
   [key: string]: {
     inventories: Array<InventoryExtraction>;
     localFiles: Array<string>;
-  }
+  };
 }
 
 export interface ExternalFile {
@@ -335,4 +379,112 @@ export interface ReuseIdentificationTaskDTO {
   overwrite: boolean;
   path?: string;
   type: InventorySourceType;
+}
+
+export enum ProjectAccessMode {
+  READ_ONLY = 'READ_ONLY',
+  WRITE = 'WRITE',
+}
+
+export interface ProjectOpenResponse {
+  logical_tree: Folder;
+  work_root: string;
+  scan_root: string;
+  sourceCodePath: string;
+  dependencies: string[];
+  uuid: string;
+  source: string;
+  metadata: Metadata;
+  mode: ProjectAccessMode;
+  lockedBy: string;
+}
+
+export interface LOCK {
+  user: string;
+  id: {
+    mac: string;
+    interface: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CryptographyResponseDTO {
+  files: Array<CryptographicItem>,
+  components: Array<CryptographicItem>
+  summary: {
+    files: {
+      type: Record<string, number>;
+      crypto: Record<string, number>;
+      typeDetection: Record<string, Array<string>>;
+    },
+    components:{
+      type: Record<string, number>;
+      crypto: Record<string, number>;
+      typeDetection: Record<string, Array<string>>;
+    }
+  },
+}
+
+/* Report Handler */
+export type ReportSummary = ISummary;
+export type ReportData = IReportData;
+
+export interface ContextFiles {
+  identifyFile: string | null;
+  ignoreFile: string | null;
+}
+
+export interface DependencyManifestFile {
+  path: string;
+  fileId: number;
+  summary: {
+    identified: number
+    ignored: number;
+    pending: number;
+  }
+}
+
+export interface GroupSearchKeyword {
+  id: number;
+  label: string;
+  words: Array<string>;
+  createdAt: string;
+  updatedAt:string;
+}
+
+export interface ComponentReportResponse {
+  components:ReportComponent[];
+  declaredComponents: ReportComponent[];
+}
+
+export interface LicenseObligation {
+  checklist_url: string;
+  copyleft: string;
+  incompatible_with: string;
+  osadl_updated: string;
+  patent_hints: string;
+  label?: string;
+}
+
+export enum ExportStatusCode {
+  SUCCESS = 'SUCCESS',
+  SUCCESS_WITH_WARNINGS = 'SUCCESS_WITH_WARNINGS',
+  FAILED = 'FAILED',
+}
+
+export interface ExportResultsInfo {
+  invalidPurls: Array<string>;
+}
+
+
+
+
+export enum ProjectSource {
+  /** Project created from imported files */
+  IMPORTED = 'IMPORTED',
+  /** Project created from direct scanning */
+  SCAN = 'SCAN',
+  /** Project created from imported scan results. result.json */
+  IMPORT_SCAN_RESULTS = 'IMPORT_SCAN_RESULTS'
 }

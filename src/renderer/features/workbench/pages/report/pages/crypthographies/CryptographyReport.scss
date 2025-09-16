@@ -1,0 +1,53 @@
+#CryptographyReportPage {
+  display: grid;
+
+
+  .app-header {
+    padding-bottom: 10px;
+    position: unset;
+    z-index: 10;
+
+    .subheader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  }
+
+  .form-row.filter {
+    .form-group {
+      min-width: 280px;
+      max-width: 600px;
+
+      &.filter-algorithm {
+        width: auto;
+
+        .MuiAutocomplete-option {
+          padding-top: 0;
+          padding-bottom: 0;
+        }
+
+        .tag:not(.option) {
+          padding: 0;
+        }
+
+        .tag.option {
+          font-size: 12px;
+        }
+      }
+    }
+  }
+
+  .algorithms {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+
+    .tag {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 400;
+      background: #e4e4e7;
+    }
+  }
+}

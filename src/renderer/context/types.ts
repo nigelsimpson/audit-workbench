@@ -1,4 +1,4 @@
-import { Inventory } from '@api/types';
+import { Inventory, ProjectAccessMode } from '@api/types';
 import { Scanner } from '../../main/task/scanner/types';
 
 export enum DIALOG_ACTIONS {
@@ -36,7 +36,14 @@ export interface InventoryForm {
 export interface IScan {
   projectName?: string;
   path: string;
+  sourceCodePath?: string;
   action: string;
   source?: Scanner.ScannerSource,
+  mode?: ProjectAccessMode,
 }
 
+export interface ImportProjectDialogProps {
+  title: string;
+  placeHolder: string;
+  openDialogProperties: Electron.OpenDialogOptions;
+}

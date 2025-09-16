@@ -1,10 +1,13 @@
 import { createSlice, current, PayloadAction } from '@reduxjs/toolkit';
-import { INewProject, IProject } from '@api/types';
-import { fetchProjects } from '@store/workspace-store/workspaceThunks';
+import { INewProject, IProject, IWorkspaceCfg } from '@api/types';
+import { fetchProjects, init, setSettings } from '@store/workspace-store/workspaceThunks';
 import { RootState } from '@store/rootReducer';
 import { IScan } from '@context/types';
+import { IAppInfo } from '@api/dto';
 
 export interface WorkspaceState {
+  appInfo: IAppInfo,
+  settings: IWorkspaceCfg,
   loading: boolean;
   projects: IProject[];
   currentProject: IProject;
@@ -13,6 +16,8 @@ export interface WorkspaceState {
 }
 
 const initialState: WorkspaceState = {
+  appInfo: null,
+  settings: null,
   loading: false,
   projects: null,
   currentProject: null,
@@ -31,7 +36,10 @@ export const workspaceSlice = createSlice({
       state.scanPath = action.payload;
     },
     setCurrentProject: (state, action: PayloadAction<IProject>) => {
-      state.currentProject = action.payload
+      state.currentProject = action.payload;
+    },
+    setApis: (state, action: PayloadAction<any>) => {
+      state.settings.APIS = action.payload;
     },
   },
   extraReducers: {
@@ -42,11 +50,20 @@ export const workspaceSlice = createSlice({
       projects: action.payload,
     }),
     [fetchProjects.rejected.type]: (state) => ({ ...state, loading: false }),
+    [init.fulfilled.type]: (state, action: PayloadAction<{ app: IAppInfo, settings: IWorkspaceCfg }>) => ({
+      ...state,
+      appInfo: action.payload.app,
+      settings: action.payload.settings,
+    }),
+    [setSettings.fulfilled.type]: (state, action: PayloadAction<IWorkspaceCfg>) => ({
+      ...state,
+      settings: action.payload,
+    }),
   },
 });
 
 // actions
-export const { setNewProject, setScanPath, setCurrentProject } = workspaceSlice.actions;
+export const { setNewProject, setScanPath, setCurrentProject, setApis } = workspaceSlice.actions;
 
 // selectors
 export const selectWorkspaceState = (state: RootState) => state.workspace;

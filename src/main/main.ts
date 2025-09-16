@@ -9,39 +9,23 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import path from 'path';
-import * as os from 'os';
-
-import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, dialog, RelaunchOptions } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import i18next from 'i18next';
-import AppConfig from '../config/AppConfigModule';
+import { execFile } from 'child_process';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import { workspace } from './workspace/Workspace';
 import { userSettingService } from './services/UserSettingService';
-import { WorkspaceMigration } from './migration/WorkspaceMigration';
 import { AppI18n, AppI18nContext } from '../shared/i18n';
 
 // handlers
-import '../api/handlers/inventory.handler';
-import '../api/handlers/component.handler';
-import '../api/handlers/project.handler';
-import '../api/handlers/results.handler';
-import '../api/handlers/file.hanlder';
-import '../api/handlers/formats.handler';
-import '../api/handlers/workspace.handler';
-import '../api/handlers/report.handler';
-import '../api/handlers/license.handler';
-import '../api/handlers/dependency.handler';
-import '../api/handlers/userSetting.handler';
-import '../api/handlers/app.handler';
-import '../api/handlers/search.handler';
-import '../api/handlers/vulnerability.handler';
-
-
+import '../api/index';
 
 import { broadcastManager } from './broadcastManager/BroadcastManager';
+import AppConfig from '../config/AppConfigModule';
+import { modelProvider } from './services/ModelProvider';
 
 class AppUpdater {
   constructor() {
@@ -73,7 +57,7 @@ if (isDebug) {
 const installExtensions = async () => {
   const installer = require('electron-devtools-installer');
   const forceDownload = !!process.env.UPGRADE_EXTENSIONS;
-  const extensions = ['REACT_DEVELOPER_TOOLS'];
+  const extensions = ['REDUX_DEVTOOLS'];
 
   return installer
     .default(
@@ -88,22 +72,18 @@ const createWindow = async () => {
     await installExtensions();
   }
 
-  const RESOURCES_PATH = app.isPackaged
-    ? path.join(process.resourcesPath, 'assets')
-    : path.join(__dirname, '../../assets');
+  const RESOURCES_PATH = app.isPackaged ? path.join(process.resourcesPath, 'assets') : path.join(__dirname, '../../assets');
 
-  const getAssetPath = (...paths: string[]): string => {
-    return path.join(RESOURCES_PATH, ...paths);
-  };
-
-
+  const getAssetPath = (...paths: string[]): string => path.join(RESOURCES_PATH, ...paths);
 
   mainWindow = new BrowserWindow({
+    title: AppConfig.APP_NAME,
     show: false,
-    width: 1300,
+    width: 1330,
     height: 820,
     icon: getAssetPath('icon.png'),
     webPreferences: {
+      sandbox: false, // TODO:  remove de access from preload.js, see https://github.com/electron/electron/issues/36437
       preload: app.isPackaged ? path.join(__dirname, 'preload.js') : path.join(__dirname, '../../.erb/dll/preload.js'),
     },
   });
@@ -122,27 +102,32 @@ const createWindow = async () => {
     }
   });
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  mainWindow.on('closed', async () => {
+      mainWindow = null;
   });
 
-   AppI18n.setLng(userSettingService.get().LNG);
-   AppI18n.init(AppI18nContext.MAIN);
+  AppI18n.setLng(userSettingService.get().LNG);
+  AppI18n.init(AppI18nContext.MAIN);
 
-   AppI18n.getI18n().on('languageChanged', async (e) => {
-     const { response } = await dialog.showMessageBox(
-       BrowserWindow.getFocusedWindow(),
-       {
-         buttons: [i18next.t('Button:RestartLater'), i18next.t('Button:RestartNow')],
-         message: i18next.t("Dialog:YouNeedRestartQuestion")
-       },
-     );
+  AppI18n.getI18n().on('languageChanged', async (e) => {
+    const { response } = await dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+      buttons: [i18next.t('Button:RestartLater'), i18next.t('Button:RestartNow')],
+      message: i18next.t('Dialog:YouNeedRestartQuestionLanguage'),
+    });
 
-     if (response === 1) {
-       app.relaunch()
-       app.exit();
-     }
-   });
+    if (response === 1) {
+      const options: RelaunchOptions = {
+        args: process.argv.slice(1).concat(['--relaunch']),
+        execPath: process.execPath,
+      };
+      if (process.env.APPIMAGE) {
+        options.execPath = process.env.APPIMAGE;
+        options.args.unshift('--appimage-extract-and-run');
+      }
+      app.relaunch(options);
+      app.exit(0);
+    }
+  });
 
   const menuBuilder = new MenuBuilder(mainWindow);
   menuBuilder.buildMenu();
@@ -165,12 +150,14 @@ const createWindow = async () => {
  * Add event listeners...
  */
 
-app.on('window-all-closed', () => {
-  // Respect the OSX convention of having the application in memory even
-  // after all windows have been closed
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+app.on('window-all-closed', async () => {
+  log.info('closing app');
+  // Release all project on close app
+  await workspace.closeAllProjects();
+  await modelProvider.workspace.openDb();
+  await modelProvider.workspace.lock.releaseProjects();
+  await modelProvider.workspace.destroy();
+  app.quit();
 });
 
 app
@@ -186,9 +173,10 @@ app
   })
   .catch(console.log);
 
+
 async function init() {
-  const root = `${os.homedir()}/${AppConfig.DEFAULT_WORKSPACE_NAME}`;
-  await workspace.read(root);
-  await userSettingService.read(root);
-  await userSettingService.update();
+  await userSettingService.read();
+  const settings = userSettingService.get();
+  const defaultWorkspacePath = settings.WORKSPACES[settings.DEFAULT_WORKSPACE_INDEX].PATH;
+  await workspace.read(defaultWorkspacePath);
 }

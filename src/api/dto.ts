@@ -1,4 +1,4 @@
-import { ComponentGroup, Dependency, ExportFormat, ExportSource, Inventory , Result} from './types';
+import { Dependency, ExportFormat, ExportSource, Inventory, InventoryType, Result } from './types';
 import { ISearchComponent } from '../main/task/componentCatalog/iComponentCatalog/ISearchComponent';
 import { IComponentResult } from '../main/task/componentCatalog/iComponentCatalog/IComponentResult';
 
@@ -52,7 +52,7 @@ export interface NewLicenseDTO {
   spdxid?: string;
 }
 
-export interface InventoryFileDTO{
+export interface InventoryFileDTO {
   inventory: Inventory,
   fromResult: Result
 }
@@ -74,6 +74,7 @@ export interface NewExportDTO {
   format: ExportFormat;
   source: ExportSource;
   path: string;
+  inventoryType?: InventoryType;
 }
 
 export enum SourceType {
@@ -82,5 +83,20 @@ export enum SourceType {
 }
 
 export interface VulnerabilitiesGetAllDTO {
+  type: SourceType,
+}
+
+export interface CryptographyGetAllDTO {
+  type: SourceType,
+}
+
+export interface GroupSearchKeywordDTO {
+  id?: number;
+  label: string;
+  words: Array<string>;
+}
+
+
+export interface ExportControlGetAllDTO {
   type: SourceType,
 }

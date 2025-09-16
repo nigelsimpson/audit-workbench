@@ -1,5 +1,5 @@
 module.exports = {
-  extends: 'erb',
+  extends: ['erb', 'airbnb', 'airbnb-typescript'],
   rules: {
     // A temporary hack related to IDE not resolving correct package.json
     'import/no-extraneous-dependencies': 'off',
@@ -15,6 +15,7 @@ module.exports = {
     'no-use-before-define': 'off',
     '@typescript-eslint/no-use-before-define': ['off'],
     'prettier/prettier': ['off', { printWidth: 120 }],
+    'max-len': ['warn', { code: 180, comments: 200 }],
     'no-nested-ternary': ['off'],
     'jsx-a11y/anchor-is-valid': ['off'],
     'no-shadow': 'off',
@@ -29,7 +30,14 @@ module.exports = {
     'import/no-cycle': ['warn'],
     'no-empty-pattern': ['off'],
     'react-hooks/exhaustive-deps': 'warn',
-    "no-plusplus": ["warn", { "allowForLoopAfterthoughts": true }],
+    'no-plusplus': ['warn', { allowForLoopAfterthoughts: true }],
+    'react/function-component-definition': ['off'],
+    'no-param-reassign': ['off'],
+    'react/jsx-one-expression-per-line': 'off',
+    'object-curly-newline': 'off',
+    'react/no-unstable-nested-components': 'off',
+    'arrow-body-style': 'off',
+    'no-return-assign': 'off',
   },
   parserOptions: {
     ecmaVersion: 2020,

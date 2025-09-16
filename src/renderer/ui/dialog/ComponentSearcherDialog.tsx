@@ -156,7 +156,7 @@ const ComponentSearcherDialog = (props: ComponentSearcherDialogProps) => {
               <Trans i18nKey="NeedApiKeyComponents" components={{
                 1: <Link
                     color="inherit"
-                    href={`${AppConfig.SCANOSS_WEBSITE_URL}/pricing`}
+                    href={`${AppConfig.ORGANIZATION_URL}/pricing`}
                     target="_blank"
                     rel="noreferrer"
                   />
@@ -238,7 +238,6 @@ const ComponentSearcherDialog = (props: ComponentSearcherDialogProps) => {
                       {...params}
                       InputProps={{
                         ...params.InputProps,
-                        disableUnderline: true,
                         className: 'autocomplete-option',
                       }}
                     />
@@ -304,10 +303,12 @@ const ComponentSearcherDialog = (props: ComponentSearcherDialogProps) => {
             },
           ]}
           localeText={{ noRowsLabel: (<Message />) as unknown as string }}
-          headerHeight={40}
-          rowHeight={22}
+          rowHeight={28}
           disableColumnMenu
-          onSelectionModelChange={onSelectionModelChange}
+          checkboxSelection
+          disableMultipleRowSelection
+          onRowSelectionModelChange={onSelectionModelChange}
+          getRowId={(row) => row.id}
           hideFooter
         />
       </main>

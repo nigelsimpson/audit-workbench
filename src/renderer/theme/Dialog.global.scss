@@ -9,6 +9,10 @@
     display: block;
   }
 
+  .MuiPaper-root {
+    box-shadow: none;
+  }
+
   .MuiDialogContent-root {
     background-color: #f4f4f5;
   }
@@ -28,9 +32,11 @@
   }
 
   .dialog-content {
-    padding: 20px 24px;
+    padding: 24px 24px;
     background-color: rgba(244, 244, 245, 1);
-    overflow: hidden;
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: hidden;
 
     .dialog-row {
       display: flex;

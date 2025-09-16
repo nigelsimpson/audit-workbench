@@ -14,18 +14,22 @@ export namespace Scanner {
     DEPENDENCIES,
     VULNERABILITIES,
     UNZIP,
+    CRYPTOGRAPHY,
   }
 
   export enum ScannerSource {
     CODE,
     WFP,
     IMPORTED,
+    IMPORTED_RESULTS_RAW
   }
 
   export interface ScannerConfig {
     mode?: ScannerMode;
     type?: ScannerType[];
     source?: ScannerSource;
+    obfuscate?: boolean;
+    hpsm?: boolean;
   }
 
   export interface StageProperties {

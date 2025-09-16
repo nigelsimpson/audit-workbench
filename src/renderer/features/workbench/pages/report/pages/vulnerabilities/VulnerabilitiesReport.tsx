@@ -58,13 +58,11 @@ const VulnerabilitiesReport = () => {
     setComponent(Array.from(new Set(data.current.map((item) => item.componentVersion.name))));
   };
 
-  const filterItems = (items: ComponentVulnerability[]) => {
-    return filter
-      ? items
-          .filter((item) => !filter.component || item.componentVersion.name === filter.component)
-          .filter((item) => !filter.severity || filter.severity.length === 0 || filter.severity.includes(item.vulnerability.severity?.toLowerCase()))
-      : items;
-  };
+  const filterItems = (items: ComponentVulnerability[]) => (filter
+    ? items
+      .filter((item) => !filter.component || item.componentVersion.name === filter.component)
+      .filter((item) => !filter.severity || filter.severity.length === 0 || filter.severity.includes(item.vulnerability.severity?.toLowerCase()))
+    : items);
 
   const onSeeDescriptionClickHandler = (e, item: ComponentVulnerability) => {
     setPopoverContent(item.vulnerability.summary);
@@ -89,7 +87,7 @@ const VulnerabilitiesReport = () => {
     <>
       <section id="VulnerabilitiesReportPage" className="app-page">
         <header className="app-header">
-          <h4 className="header-subtitle back pl-3">
+          <h4 className="header-subtitle back">
             <IconButton onClick={() => navigate(-1)} component="span">
               <ArrowBackIcon />
             </IconButton>
@@ -104,6 +102,7 @@ const VulnerabilitiesReport = () => {
                   <Paper>
                     <Autocomplete
                       id="input-component"
+                      size="small"
                       options={components}
                       disablePortal
                       onChange={(e_, value) => onFilterHandler({ component: value })}
@@ -125,6 +124,7 @@ const VulnerabilitiesReport = () => {
                   <Paper>
                     <Autocomplete
                       options={['critical', 'high', 'medium', 'low']}
+                      size="small"
                       disablePortal
                       multiple
                       forcePopupIcon
@@ -133,20 +133,18 @@ const VulnerabilitiesReport = () => {
                       renderOption={(props, option, { selected }) => (
                         <li {...props}>
                           <Checkbox style={{ marginRight: 8 }} checked={selected} />
-                          <span className={`tag tag-${option} option` }> {option} </span>
+                          <span className={`tag tag-${option} option`}> {option} </span>
                         </li>
                       )}
-                      renderTags={(value: readonly string[], getTagProps) =>
-                        value.map((option: string, index: number) => (
-                          <Chip
-                            key={option}
-                            label={option}
-                            size="small"
-                            {...getTagProps({ index })}
-                            className={`tag tag-${option} mr-1`}
-                          />
-                        ))
-                      }
+                      renderTags={(value: readonly string[], getTagProps) => value.map((option: string, index: number) => (
+                        <Chip
+                          key={option}
+                          label={option}
+                          size="small"
+                          {...getTagProps({ index })}
+                          className={`tag tag-${option} mr-1`}
+                        />
+                      ))}
                       renderInput={(params) => (
                         <TextField
                           {...params}
@@ -173,6 +171,7 @@ const VulnerabilitiesReport = () => {
             <Table stickyHeader aria-label="vulnerabilities table">
               <TableHead>
                 <TableRow>
+                  <TableCell>id</TableCell>
                   <TableCell>{t('Table:Header:Component')}</TableCell>
                   <TableCell>{t('Table:Header:Severity')}</TableCell>
                   <TableCell>{t('Table:Header:CVE')}</TableCell>
@@ -185,36 +184,42 @@ const VulnerabilitiesReport = () => {
               <TableBody>
                 {items?.map((item) => (
                   <TableRow key={item.purl + item.version + item.vulnerability.cve}>
+                    <TableCell>
+                      {item.vulnerability.external_id}
+                    </TableCell>
                     <TableCell className="pb-0 pt-0">
                       <ListItemText
                         primary={item.componentVersion.name}
-                        secondary={item.componentVersion.purl}
+                        secondary={`${item.componentVersion.purl}@${item.componentVersion.version}`}
                       />
                     </TableCell>
                     <TableCell>
                       <span className={`tag tag-${item.vulnerability.severity?.toLowerCase()}`}>{item.vulnerability.severity}</span>
                     </TableCell>
                     <TableCell><Link
-                                  className="d-flex align-center"
-                                  href={`https://nvd.nist.gov/vuln/detail/${item.vulnerability.cve}`}
-                                  target="_blank" rel="noreferrer">
-                                    {item.vulnerability.cve}  <OpenInNewOutlinedIcon className="external-link" fontSize="small" />
-                                  </Link>
+                      className="d-flex align-center"
+                      href={`https://nvd.nist.gov/vuln/detail/${item.vulnerability.cve}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {item.vulnerability.cve}  <OpenInNewOutlinedIcon className="external-link" fontSize="small" />
+                    </Link>
                     </TableCell>
                     <TableCell>{item.vulnerability.source}</TableCell>
                     <TableCell>{item.vulnerability.published}</TableCell>
                     <TableCell>{item.vulnerability.modified}</TableCell>
                     <TableCellActions>
-                      {item.vulnerability.summary &&
+                      {item.vulnerability.summary
+                        && (
                         <IconButton
                           title={t('Tooltip:SeeDescription')}
                           aria-label="see description"
                           size="small"
                           onClick={(e) => onSeeDescriptionClickHandler(e, item)}
                         >
-                          <ReceiptLongOutlinedIcon fontSize="inherit"/>
+                          <ReceiptLongOutlinedIcon fontSize="inherit" />
                         </IconButton>
-                      }
+                        )}
                     </TableCellActions>
                   </TableRow>
                 ))}

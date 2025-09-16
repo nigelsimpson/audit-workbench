@@ -2,103 +2,81 @@ import { IpcChannels } from '../ipc-channels';
 import {
   ExtractFromProjectDTO,
   FileTreeViewMode,
-  INewProject, Inventory, InventoryKnowledgeExtraction,
+  INewProject,
+  Inventory,
+  InventoryKnowledgeExtraction,
   IProject,
-  IWorkbenchFilter, ReuseIdentificationTaskDTO
+  IWorkbenchFilter,
+  ProjectAccessMode,
+  ProjectOpenResponse,
+  ReuseIdentificationTaskDTO,
 } from '../types';
 import { BaseService } from './base.service';
 
-
 class ProjectService extends BaseService {
   public async get(args: Partial<IProject>): Promise<any> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.INVENTORY_GET,
-      args
-    );
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.INVENTORY_GET, args);
     return response;
   }
 
   public async resume(path: string): Promise<any> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.PROJECT_RESUME_SCAN,
-      path
-    );
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.PROJECT_RESUME_SCAN, { path });
     return response;
   }
 
   public async stop(): Promise<any> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.PROJECT_STOP_SCAN
-    );
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.PROJECT_STOP_SCAN);
     return response;
   }
 
   public async create(project: INewProject): Promise<any> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.PROJECT_CREATE,
-      project
-    );
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.PROJECT_CREATE, project);
     return response;
   }
 
   public async rescan(path: string): Promise<void> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.PROJECT_RESCAN,
-      path
-    );
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.PROJECT_RESCAN, { path });
     return this.response(response);
   }
 
-  public async load(path: string): Promise<any> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.PROJECT_OPEN_SCAN,
-      path
-    );
-    return response;
+  public async load(path: string, mode?: ProjectAccessMode): Promise<ProjectOpenResponse> {
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.PROJECT_OPEN_SCAN, { path, mode });
+
+    return this.response(response);
   }
 
   public async getProjectName(): Promise<any> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.UTILS_PROJECT_NAME
-    );
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.UTILS_PROJECT_NAME);
     return response;
   }
 
   public async getNodeFromPath(path: string): Promise<any> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.UTILS_GET_NODE_FROM_PATH,
-      path
-    );
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.UTILS_GET_NODE_FROM_PATH, path);
     return this.response(response);
   }
 
   public async getToken(): Promise<any> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.GET_TOKEN
-    );
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.GET_TOKEN);
     return this.response(response);
   }
 
   public async getTree(): Promise<any> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.PROJECT_READ_TREE
-    );
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.PROJECT_READ_TREE);
     return this.response(response);
   }
 
   public async setFilter(filter: IWorkbenchFilter): Promise<any> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.PROJECT_SET_FILTER,
-      filter
-    );
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.PROJECT_SET_FILTER, filter);
     return this.response(response);
   }
 
   public async setFileTreeViewMode(mode: FileTreeViewMode): Promise<any> {
-    const response = await window.electron.ipcRenderer.invoke(
-      IpcChannels.PROJECT_SET_FILE_TREE_VIEW_MODE,
-      mode
-    );
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.PROJECT_SET_FILE_TREE_VIEW_MODE, mode);
+    return this.response(response);
+  }
+
+  public async getApiURL(): Promise<string> {
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.GET_API_URL);
     return this.response(response);
   }
 
@@ -107,17 +85,20 @@ class ProjectService extends BaseService {
     return this.response(response);
   }
 
-  public async extractInventoryKnowledge(param: ExtractFromProjectDTO): Promise<InventoryKnowledgeExtraction>{
+  public async extractInventoryKnowledge(param: ExtractFromProjectDTO): Promise<InventoryKnowledgeExtraction> {
     const response = await window.electron.ipcRenderer.invoke(IpcChannels.PROJECT_EXTRACT_INVENTORY_KNOWLEDGE, param);
-    console.log(param, response);
     return this.response(response);
   }
 
-  public async acceptInventoryKnowledge(param: ReuseIdentificationTaskDTO): Promise<Inventory>{
+  public async acceptInventoryKnowledge(param: ReuseIdentificationTaskDTO): Promise<Inventory> {
     const response = await window.electron.ipcRenderer.invoke(IpcChannels.PROJECT_ACCEPT_INVENTORY_KNOWLEDGE, param);
     return this.response(response);
   }
 
+  public async close(): Promise<IProject> {
+    const response = await window.electron.ipcRenderer.invoke(IpcChannels.PROJECT_CURRENT_CLOSE);
+    return this.response(response);
+  }
 }
-export const projectService = new ProjectService();
 
+export const projectService = new ProjectService();

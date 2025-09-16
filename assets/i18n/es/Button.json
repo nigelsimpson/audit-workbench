@@ -1,6 +1,7 @@
 {
   "NewProject": "Nuevo proyecto",
-  "ImportProject": "Importar proyecto",
+  "ImportProject": "Importar proyecto Workbench",
+  "ImportProjectWithSource": "Importar proyecto con fuente",
   "Continue": "Continuar",
   "Save": "Guardar",
   "Cancel": "Cancelar",
@@ -39,6 +40,10 @@
   "Yes": "Si",
   "RestartLater": "Reiniciar más tarde",
   "RestartNow": "Reiniciar ahora",
-  "NewFromWFPFile": "Nuevo desde WFP"
+  "NewFromWFPFile": "Nuevo desde WFP",
+  "AddNewWorkspace": "Nuevo espacio de trabajo",
+  "ImportFromResultFile": "Importar desde un resultado de escaneo",
+  "ImportFromWFPFile": "Importar desde un WFP",
+  "Browse": "Buscar"
   }
 
